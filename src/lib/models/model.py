@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import torch
 
 from src.lib.models.networks.dlav0 import get_pose_net as get_dlav0

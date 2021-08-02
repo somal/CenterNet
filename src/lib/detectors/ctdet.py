@@ -8,8 +8,8 @@ import numpy as np
 import torch
 
 try:
-    from external.nms import soft_nms
-except:
+    from src.lib.external.nms import soft_nms
+except ImportError:
     print('NMS not imported! If you need it,'
           ' do \n cd $CenterNet_ROOT/src/lib/external \n make')
 from src.lib.models.decode import ctdet_decode

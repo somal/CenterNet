@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from src.lib.datasets.dataset.coco import COCO
 from src.lib.datasets.dataset.coco_cl import COCO_CL
 from src.lib.datasets.dataset.coco_hp import COCOHP
