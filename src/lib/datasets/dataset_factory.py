@@ -2,16 +2,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from .sample.ddd import DddDataset
-from .sample.exdet import EXDetDataset
-from .sample.ctdet import CTDetDataset
-from .sample.multi_pose import MultiPoseDataset
-
-from .dataset.coco import COCO
-from .dataset.pascal import PascalVOC
-from .dataset.kitti import KITTI
-from .dataset.coco_hp import COCOHP
-
+from src.lib.datasets.dataset.coco import COCO
+from src.lib.datasets.dataset.coco_cl import COCO_CL
+from src.lib.datasets.dataset.coco_hp import COCOHP
+from src.lib.datasets.dataset.kitti import KITTI
+from src.lib.datasets.dataset.pascal import PascalVOC
+from src.lib.datasets.sample.ctdet import CTDetDataset
+from src.lib.datasets.sample.ddd import DddDataset
+from src.lib.datasets.sample.exdet import EXDetDataset
+from src.lib.datasets.sample.multi_pose import MultiPoseDataset
 
 dataset_factory = {
   'coco': COCO,
@@ -21,15 +20,15 @@ dataset_factory = {
 }
 
 _sample_factory = {
-  'exdet': EXDetDataset,
-  'ctdet': CTDetDataset,
-  'ddd': DddDataset,
-  'multi_pose': MultiPoseDataset
+    'exdet': EXDetDataset,
+    'ctdet': CTDetDataset,
+    'ddd': DddDataset,
+    'multi_pose': MultiPoseDataset
 }
 
 
 def get_dataset(dataset, task):
-  class Dataset(dataset_factory[dataset], _sample_factory[task]):
-    pass
-  return Dataset
-  
+    class Dataset(dataset_factory[dataset], _sample_factory[task]):
+        pass
+
+    return Dataset
