@@ -13,10 +13,11 @@ from src.lib.datasets.sample.exdet import EXDetDataset
 from src.lib.datasets.sample.multi_pose import MultiPoseDataset
 
 dataset_factory = {
-  'coco': COCO,
-  'pascal': PascalVOC,
-  'kitti': KITTI,
-  'coco_hp': COCOHP
+    'coco': COCO,
+    'coco_cl': COCO_CL,
+    'pascal': PascalVOC,
+    'kitti': KITTI,
+    'coco_hp': COCOHP
 }
 
 _sample_factory = {
