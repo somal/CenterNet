@@ -15,7 +15,7 @@ After install Anaconda:
     conda activate CenterNet
     ~~~
 
-1. Install pytorch0.4.1:
+1. Install pytorch0.4.1 (can use pytorch 1.x also):
 
     ~~~
     conda install pytorch=0.4.1 torchvision -c pytorch
@@ -58,7 +58,7 @@ After install Anaconda:
     ~~~
     
     
-5. Compile deformable convolutional (from [DCNv2](https://github.com/CharlesShang/DCNv2/tree/pytorch_0.4)).
+5. Compile deformable convolutional (from [DCNv2 for pytorch 0.4](https://github.com/CharlesShang/DCNv2/tree/pytorch_0.4) or [DCNv2 for pytorch 1.x (switch to specific branch)](https://github.com/lbin/DCNv2/tree/master)).
 
     ~~~
     cd $CenterNet_ROOT/src/lib/models/networks/DCNv2
