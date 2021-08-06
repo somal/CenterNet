@@ -1,6 +1,8 @@
 import os
+from typing import List
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 
 from src.lib.detectors.detector_factory import detector_factory
@@ -28,6 +30,13 @@ def check_intersection_line_and_rect(line, bbox):
                 ])
 
 
+def gaps_from_inter_times(times: List[float]):
+    y = [times[0]] if len(times) > 0 else []
+    for j in range(1, len(times)):
+        y.append((times[j] - times[j - 1]))
+    return np.array(y)
+
+
 def demo(opt):
     os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpus_str
     opt.debug = max(opt.debug, 1)
@@ -43,37 +52,62 @@ def demo(opt):
 
         cam = cv2.VideoCapture(0 if opt.demo == 'webcam' else opt.demo)
         detector.pause = False
-        lines = [((90, 350), (420, 110)), ((358, 400), (550, 100))]
+        # lines = [((90, 350), (420, 110)), ((358, 400), (550, 100))] # cl2.mp4
+        lines = [((223, 138), (300, 480)),
+                 ((292, 142), (444, 480))]  # loopmarkers/ip:10.224.44.8_id:20_start:07:39:30.mp4
 
         min_frames = 10 * fps
         inter_times_per_line = [[], []]
         frame_number = 0
+        rrr = {0: 'L', 1: 'R'}
         while True:
             frame_number += 1
-            _, img = cam.read()
+            if frame_number > (19 * 60 + 14) * fps:
+                print('Finish by time')
+                break
+            is_opened, img = cam.read()
+            if not is_opened:
+                print('Finish by unabled images')
+                break
             img = cv2.resize(img, (640, 480))
-            cv2.imshow('input', img)
-            # [cv2.line(img, *line, color=(255, 255, 255), thickness=3) for line in lines]
+            # cv2.imshow('input', img)
+            [cv2.line(img, *line, color=(255, 255, 255), thickness=3) for line in lines]
             img_res, ret = detector.run(img)
 
-            for bbox in ret['results'][2]:
-                if bbox[4] > .3:
-                    rect_bbox = tuple(map(int, bbox[:4]))
-                    for i in range(len(lines)):
-                        if (len(inter_times_per_line[i]) > 0
-                            and frame_number - inter_times_per_line[i][-1] >= min_frames) or \
-                                len(inter_times_per_line[i]) == 0:
-                            # rect_inter = cv2.rotatedRectangleIntersection(rects[i], rect_bbox)
-                            if check_intersection_line_and_rect(lines[i], rect_bbox):
-                                # print(rect_inter)
-                                inter_times_per_line[i].append(frame_number)
-                                print(i, inter_times_per_line)
+            # seat (2) -> .3
+            # miner (1) -> .1
+            threshold = {1: .1, 2: .1, 3: .1}
+            for class_id in (1, 2):
+                for bbox in ret['results'][class_id]:
+                    if bbox[4] > threshold[class_id]:
+                        rect_bbox = tuple(map(int, bbox[:4]))
+                        for i in range(len(lines)):
+                            if (len(inter_times_per_line[i]) > 0
+                                and frame_number - inter_times_per_line[i][-1] >= min_frames) or \
+                                    len(inter_times_per_line[i]) == 0:
 
-            rrr = {0: 'L', 1: 'R'}
+                                if check_intersection_line_and_rect(lines[i], rect_bbox):
+                                    inter_times_per_line[i].append(frame_number)
+                                    print(i, frame_number)
+
+            # loopmaker_detected = False
+            # for bbox in ret['results'][3]:
+            #     if bbox[4] > .2:
+            #         loopmaker_detected = True
+            #         print(f'Loopmaker detected, time: {frame_number / fps}, thresh: {bbox[4]}')
+            #         break
+            # if loopmaker_detected:
+            #     break
+            # max_confs = {1: 0, 3: 0}
+            # for i in max_confs.keys():
+            #     for bbox in ret['results'][i]:
+            #         max_confs[i] = max(max_confs[i], bbox[4])
+            # print(max_confs)
+
             for i in range(len(lines)):
-                frame_diff = (inter_times_per_line[i][-1]) / len(inter_times_per_line[i]) \
-                    if len(inter_times_per_line[i]) else 0
-                cv2.putText(img_res, f'Avg gap time {rrr[i]} {frame_diff / fps:.2f}', (30, 50 * (i + 1)),
+                gaps = gaps_from_inter_times(inter_times_per_line[i])
+                frame_diff = gaps[-1] / fps if len(gaps) > 0 else 0
+                cv2.putText(img_res, f'Gap time {rrr[i]} {frame_diff:.2f}', (30, 50 * (i + 1)),
                             fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
             cv2.putText(img_res, f'Count L {len(inter_times_per_line[0])}    R {len(inter_times_per_line[1])}',
                         (30, 50 * (len(lines) + 1)),
@@ -83,11 +117,26 @@ def demo(opt):
             time_str = ''
             for stat in time_stats:
                 time_str = time_str + '{} {:.3f}s |'.format(stat, ret[stat])
-            # print(time_str)
-            if cv2.waitKey(1) == 27:
-                cam.release()
-                out.release()
-                return  # esc to quit
+            if cv2.waitKey(1) == ord(' '):
+                print('Break the loop')
+                break
+
+        # Close all opened files
+        cam.release()
+        out.release()
+        # Plot time graphic
+        print('Plotting')
+        fig = plt.figure()
+        for i, times in enumerate(inter_times_per_line):
+            y = gaps_from_inter_times(times)
+            X = np.array(times) / fps
+            y = np.array(y) / fps
+            plt.plot(X, y, label=f'{rrr[i]}', marker='*')
+        plt.legend()
+        plt.xlabel('Time (sec)')
+        plt.ylabel('Gap (sec)')
+        plt.title('Gaps along time')
+        fig.savefig('cl_times.png')
     else:
         if os.path.isdir(opt.demo):
             image_names = []

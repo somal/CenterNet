@@ -14,7 +14,7 @@ class COCO_CL(data.Dataset):
                     dtype=np.float32).reshape(1, 1, 3)
     std = np.array([0.28863828, 0.27408164, 0.27809835],
                    dtype=np.float32).reshape(1, 1, 3)
-    class_name = ['miner', 'seat', 'loopmaker']
+    class_name = ['miner', 'seat', 'loopmarker']
 
     def __init__(self, opt, split):
         super(COCO_CL, self).__init__()
