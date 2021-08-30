@@ -53,8 +53,8 @@ def demo(opt):
         cam = cv2.VideoCapture(0 if opt.demo == 'webcam' else opt.demo)
         detector.pause = False
         # lines = [((90, 350), (420, 110)), ((358, 400), (550, 100))] # cl2.mp4
-        lines = [((223, 138), (300, 480)),
-                 ((292, 142), (444, 480))]  # loopmarkers/ip:10.224.44.8_id:20_start:07:39:30.mp4
+        lines = [((261, 155), (330, 480)),
+                 ((480, 480), (315, 135))]  # loopmarkers/ip:10.224.44.8_id:20_start:07:39:30.mp4
 
         min_frames = 10 * fps
         inter_times_per_line = [[], []]
@@ -71,7 +71,7 @@ def demo(opt):
                 break
             img = cv2.resize(img, (640, 480))
             # cv2.imshow('input', img)
-            [cv2.line(img, *line, color=(255, 255, 255), thickness=3) for line in lines]
+            # [cv2.line(img, *line, color=(255, 255, 255), thickness=3) for line in lines]
             img_res, ret = detector.run(img)
 
             # seat (2) -> .3

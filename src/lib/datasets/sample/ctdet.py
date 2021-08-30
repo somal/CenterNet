@@ -12,12 +12,14 @@ from src.lib.utils.image import get_affine_transform, affine_transform
 
 
 class CTDetDataset(data.Dataset):
-    def _coco_box_to_bbox(self, box):
+    @staticmethod
+    def _coco_box_to_bbox(box):
         bbox = np.array([box[0], box[1], box[0] + box[2], box[1] + box[3]],
                         dtype=np.float32)
         return bbox
 
-    def _get_border(self, border, size):
+    @staticmethod
+    def _get_border(border, size):
         i = 1
         while size - border // i <= border // i:
             i *= 2
@@ -48,8 +50,8 @@ class CTDetDataset(data.Dataset):
         if self.split == 'train':
             if not self.opt.not_rand_crop:
                 s = s * np.random.choice(np.arange(0.6, 1.4, 0.1))
-                w_border = self._get_border(128, img.shape[1])
-                h_border = self._get_border(128, img.shape[0])
+                w_border = CTDetDataset._get_border(128, img.shape[1])
+                h_border = CTDetDataset._get_border(128, img.shape[0])
                 c[0] = np.random.randint(low=w_border, high=img.shape[1] - w_border)
                 c[1] = np.random.randint(low=h_border, high=img.shape[0] - h_border)
             else:
@@ -95,7 +97,7 @@ class CTDetDataset(data.Dataset):
         gt_det = []
         for k in range(num_objs):
             ann = anns[k]
-            bbox = self._coco_box_to_bbox(ann['bbox'])
+            bbox = CTDetDataset._coco_box_to_bbox(ann['bbox'])
             cls_id = int(self.cat_ids[ann['category_id']])
             if flipped:
                 bbox[[0, 2]] = width - bbox[[2, 0]] - 1

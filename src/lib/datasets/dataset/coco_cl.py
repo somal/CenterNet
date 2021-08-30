@@ -1,5 +1,6 @@
 import json
 import os
+from typing import List, Dict
 
 import numpy as np
 import pycocotools.coco as coco
@@ -11,22 +12,15 @@ class COCO_CL(data.Dataset):
     num_classes = 3
     default_resolution = [512, 512]
     mean = np.array([0.40789654, 0.44719302, 0.47026115],
-                    dtype=np.float32).reshape(1, 1, 3)
+                    dtype=np.float32).reshape((1, 1, 3))
     std = np.array([0.28863828, 0.27408164, 0.27809835],
-                   dtype=np.float32).reshape(1, 1, 3)
-    class_name = ['miner', 'seat', 'loopmarker']
+                   dtype=np.float32).reshape((1, 1, 3))
+    class_name = ('miner', 'seat', 'loopmarker')
 
-    def __init__(self, opt, split):
+    def __init__(self, opt, split, annotation_folder: str):
         super(COCO_CL, self).__init__()
-        self.data_dir = opt.data_dir
-        self.img_dir = os.path.join(self.data_dir, '21')
-        self.annot_path = os.path.join(self.img_dir, 'COCO_annotation.json')
-
         self.max_objs = 128
-        self._valid_ids = [0, 1, 2]
-        self.cat_ids = {v: i for i, v in enumerate(self._valid_ids)}
-        self.voc_color = [(v // 32 * 64 + 64, (v // 8) % 4 * 64, v % 8 * 32) \
-                          for v in range(1, self.num_classes + 1)]
+        self.voc_color = [(v // 32 * 64 + 64, (v // 8) % 4 * 64, v % 8 * 32) for v in range(1, self.num_classes + 1)]
         self._data_rng = np.random.RandomState(123)
         self._eig_val = np.array([0.2141788, 0.01817699, 0.00341571],
                                  dtype=np.float32)
@@ -42,14 +36,31 @@ class COCO_CL(data.Dataset):
         self.opt = opt
 
         print('==> initializing coco cabel_line {} data.'.format(split))
+        self.data_dir = opt.data_dir
+        self.cocos = []  # type: List[coco.COCO]
+        self.images = set([])
+
+        self.img_dir = os.path.join(self.data_dir, annotation_folder, '1')
+        self.annot_path = os.path.join(self.img_dir, 'lbl', 'COCO_annotation.json')
         self.coco = coco.COCO(self.annot_path)
-        self.images = self.coco.getImgIds()
-        self.num_samples = len(self.images)
+        self._valid_ids = self.coco.getCatIds(catNms=self.class_name)
 
-        print('Loaded {} {} samples'.format(split, self.num_samples))
+        print(f'Img stats')
+        for i, id in enumerate(self._valid_ids):
+            img_ids = self.coco.getImgIds(catIds=id)
+            print(f'{self.class_name[i]}: {len(img_ids)}')
+            self.images.update(set(img_ids))
+        assert isinstance(self._valid_ids, list) and isinstance(self._valid_ids[0], int)
+        self.cat_ids = {v: i for i, v in enumerate(self._valid_ids)}  # type: Dict[int]
+        print(self.cat_ids)
+        self.num_samples = len(self.images)  # type: int
+        self.images = list(self.images)  # type: List[int]
 
-    def _to_float(self, x):
-        return float("{:.2f}".format(x))
+        print(f'Loaded {split} {self.num_samples} samples with classes {self.class_name}')
+
+    @staticmethod
+    def _to_float(x):
+        return float(f"{x:.2f}")
 
     def convert_eval_format(self, all_bboxes):
         # import pdb; pdb.set_trace()
@@ -61,7 +72,7 @@ class COCO_CL(data.Dataset):
                     bbox[2] -= bbox[0]
                     bbox[3] -= bbox[1]
                     score = bbox[4]
-                    bbox_out = list(map(self._to_float, bbox[0:4]))
+                    bbox_out = list(map(COCO_CL._to_float, bbox[0:4]))
 
                     detection = {
                         "image_id": int(image_id),
@@ -70,7 +81,7 @@ class COCO_CL(data.Dataset):
                         "score": float("{:.2f}".format(score))
                     }
                     # if len(bbox) > 5:
-                    #     extreme_points = list(map(self._to_float, bbox[5:13]))
+                    #     extreme_points = list(map(COCO_CL._to_float, bbox[5:13]))
                     #     detection["extreme_points"] = extreme_points
                     detections.append(detection)
         return detections
@@ -87,8 +98,8 @@ class COCO_CL(data.Dataset):
         # detections  = self.convert_eval_format(results)
         # json.dump(detections, open(result_json, "w"))
         self.save_results(results, save_dir)
-        coco_dets = self.coco.loadRes('{}/results.json'.format(save_dir))
-        coco_eval = COCOeval(self.coco, coco_dets, "bbox")
+        coco_dets = self.cocos[-1].loadRes('{}/results.json'.format(save_dir))
+        coco_eval = COCOeval(self.cocos[-1], coco_dets, "bbox")
         coco_eval.evaluate()
         coco_eval.accumulate()
         coco_eval.summarize()

@@ -5,7 +5,7 @@ from __future__ import print_function
 import os
 
 import torch
-import torch.utils.data
+import torch.utils.data as data
 
 from src.lib.datasets.dataset_factory import get_dataset
 from src.lib.logger import Logger
@@ -13,8 +13,20 @@ from src.lib.models.model import create_model, load_model, save_model
 from src.lib.opts import opts
 from src.lib.trains.train_factory import train_factory
 
+coco_annotation_folders = ('esaul_20', 'esaul_21', 'raspd-2_30', 'rcocs-1_12')
+
+
+def build_dataset(dataset_cls, opt, split):
+    if opt.dataset != 'coco_cl':
+        return dataset_cls(opt, split)
+    else:
+        return data.ConcatDataset(
+            [dataset_cls(opt, split, annotation_folder=ann_path) for ann_path in coco_annotation_folders])
+
 
 def main(opt):
+    opt.data_dir = '/home/msokolov/PycharmProjects/bd_presales/cable_line/datasets/'
+
     torch.manual_seed(opt.seed)
     torch.backends.cudnn.benchmark = not opt.not_cuda_benchmark and not opt.test
     Dataset = get_dataset(opt.dataset, opt.task)
@@ -40,7 +52,7 @@ def main(opt):
 
     print('Setting up data...')
     val_loader = torch.utils.data.DataLoader(
-        Dataset(opt, 'val'),
+        build_dataset(Dataset, opt, 'val'),
         batch_size=1,
         shuffle=False,
         num_workers=1,
@@ -53,7 +65,7 @@ def main(opt):
         return
 
     train_loader = torch.utils.data.DataLoader(
-        Dataset(opt, 'train'),
+        build_dataset(Dataset, opt, 'train'),
         batch_size=opt.batch_size,
         shuffle=True,
         num_workers=opt.num_workers,

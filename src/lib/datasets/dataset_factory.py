@@ -1,3 +1,5 @@
+
+
 from src.lib.datasets.dataset.coco import COCO
 from src.lib.datasets.dataset.coco_cl import COCO_CL
 from src.lib.datasets.dataset.coco_hp import COCOHP
@@ -24,8 +26,8 @@ _sample_factory = {
 }
 
 
-def get_dataset(dataset, task):
-    class Dataset(dataset_factory[dataset], _sample_factory[task]):
+def get_dataset(dataset: str, task: str):
+    class CombinedDataset(dataset_factory[dataset], _sample_factory[task]):
         pass
 
-    return Dataset
+    return CombinedDataset
