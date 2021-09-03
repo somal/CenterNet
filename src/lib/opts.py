@@ -8,7 +8,7 @@ class Struct:
             self.__setattr__(k, v)
 
 
-class opts(object):
+class Opts(object):
     def __init__(self):
         self.parser = argparse.ArgumentParser()
         # basic experiment setting
@@ -358,5 +358,5 @@ class opts(object):
         opt = self.parse(args)
         dataset = Struct(default_dataset_info[opt.task])
         opt.dataset = dataset.dataset
-        opt = opts.update_dataset_info_and_set_heads(opt, dataset)
+        opt = Opts.update_dataset_info_and_set_heads(opt, dataset)
         return opt

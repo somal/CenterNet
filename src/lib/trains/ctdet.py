@@ -51,10 +51,9 @@ class CtdetLoss(torch.nn.Module):
             if opt.wh_weight > 0:
                 if opt.dense_wh:
                     mask_weight = batch['dense_wh_mask'].sum() + 1e-4
-                    wh_loss += (
-                                       self.crit_wh(output['wh'] * batch['dense_wh_mask'],
-                                                    batch['dense_wh'] * batch['dense_wh_mask']) /
-                                       mask_weight) / opt.num_stacks
+                    wh_loss += (self.crit_wh(output['wh'] * batch['dense_wh_mask'],
+                                             batch['dense_wh'] * batch['dense_wh_mask']) /
+                                mask_weight) / opt.num_stacks
                 elif opt.cat_spec_wh:
                     wh_loss += self.crit_wh(
                         output['wh'], batch['cat_spec_mask'],

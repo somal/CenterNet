@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src.lib.detectors.detector_factory import detector_factory
-from src.lib.opts import opts
+from src.lib.opts import Opts
 
 image_ext = ['jpg', 'jpeg', 'png', 'webp']
 video_ext = ['mp4', 'mov', 'avi', 'mkv']
@@ -157,5 +157,5 @@ def demo(opt):
 
 
 if __name__ == '__main__':
-    opt = opts().init()
+    opt = Opts().init()
     demo(opt)

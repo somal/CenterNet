@@ -8,7 +8,7 @@ from src.lib.datasets.dataset.coco_cl import MultipleAnnotationsCOCOCL
 from src.lib.datasets.dataset_factory import get_dataset
 from src.lib.logger import Logger
 from src.lib.models.model import create_model, load_model, save_model
-from src.lib.opts import opts
+from src.lib.opts import Opts
 from src.lib.trains.train_factory import train_factory
 
 coco_annotation_folders = ('esaul_20', 'esaul_21', 'raspd-2_30', 'rcocs-1_12')
@@ -28,7 +28,7 @@ def main(opt: argparse.Namespace):
     torch.manual_seed(opt.seed)
     torch.backends.cudnn.benchmark = not opt.not_cuda_benchmark and not opt.test
     Dataset = get_dataset(opt.dataset, opt.task)
-    opt = opts().update_dataset_info_and_set_heads(opt, Dataset)
+    opt = Opts().update_dataset_info_and_set_heads(opt, Dataset)
     print(opt)
 
     logger = Logger(opt)
@@ -109,5 +109,5 @@ def main(opt: argparse.Namespace):
 
 
 if __name__ == '__main__':
-    opt = opts().parse()  # type: argparse.Namespace
+    opt = Opts().parse()  # type: argparse.Namespace
     main(opt)

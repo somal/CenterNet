@@ -6,7 +6,7 @@ import torch
 from src.lib.datasets.dataset_factory import dataset_factory
 from src.lib.detectors.detector_factory import detector_factory
 from src.lib.logger import Logger
-from src.lib.opts import opts
+from src.lib.opts import Opts
 from progress.bar import Bar
 from src.lib.utils.utils import AverageMeter
 
@@ -41,7 +41,7 @@ def prefetch_test(opt):
     os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpus_str
 
     Dataset = dataset_factory[opt.dataset]
-    opt = opts().update_dataset_info_and_set_heads(opt, Dataset)
+    opt = Opts().update_dataset_info_and_set_heads(opt, Dataset)
     print(opt)
     Logger(opt)
     Detector = detector_factory[opt.task]
@@ -77,7 +77,7 @@ def test(opt):
     os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpus_str
 
     Dataset = dataset_factory[opt.dataset]
-    opt = opts().update_dataset_info_and_set_heads(opt, Dataset)
+    opt = Opts().update_dataset_info_and_set_heads(opt, Dataset)
     print(opt)
     Logger(opt)
     Detector = detector_factory[opt.task]
@@ -114,7 +114,7 @@ def test(opt):
 
 
 if __name__ == '__main__':
-    opt = opts().parse()
+    opt = Opts().parse()
     if opt.not_prefetch_test:
         test(opt)
     else:
