@@ -5,8 +5,9 @@ from __future__ import print_function
 import os
 
 import torch
-import torch.utils.data as data
+from torch.utils import data
 
+from src.lib.datasets.dataset.coco_cl import MultipleAnnotationsCOCOCL
 from src.lib.datasets.dataset_factory import get_dataset
 from src.lib.logger import Logger
 from src.lib.models.model import create_model, load_model, save_model
@@ -17,11 +18,11 @@ coco_annotation_folders = ('esaul_20', 'esaul_21', 'raspd-2_30', 'rcocs-1_12')
 
 
 def build_dataset(dataset_cls, opt, split):
-    if opt.dataset != 'coco_cl':
-        return dataset_cls(opt, split)
+    if opt.dataset == 'coco_cl' and opt.task == 'ctdet':
+        new_dataset_instance = MultipleAnnotationsCOCOCL.build(dataset_cls, opt, split, coco_annotation_folders)
+        return new_dataset_instance
     else:
-        return data.ConcatDataset(
-            [dataset_cls(opt, split, annotation_folder=ann_path) for ann_path in coco_annotation_folders])
+        return dataset_cls(opt, split)
 
 
 def main(opt):
@@ -52,7 +53,7 @@ def main(opt):
 
     print('Setting up data...')
     val_loader = torch.utils.data.DataLoader(
-        build_dataset(Dataset, opt, 'val'),
+        dataset=build_dataset(Dataset, opt, 'val'),
         batch_size=1,
         shuffle=False,
         num_workers=1,
@@ -60,12 +61,14 @@ def main(opt):
     )
 
     if opt.test:
+        print('Start testing')
         _, preds = trainer.val(0, val_loader)
-        val_loader.dataset.run_eval(preds, opt.save_dir)
+        # val_loader.dataset.run_eval(preds, opt.save_dir)
+        [d.run_eval(preds, opt.save_dir) for d in val_loader.dataset.datasets]
         return
 
     train_loader = torch.utils.data.DataLoader(
-        build_dataset(Dataset, opt, 'train'),
+        dataset=build_dataset(Dataset, opt, 'train'),
         batch_size=opt.batch_size,
         shuffle=True,
         num_workers=opt.num_workers,

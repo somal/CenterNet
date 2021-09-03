@@ -6,6 +6,12 @@ import argparse
 import os
 
 
+class Struct:
+    def __init__(self, entries):
+        for k, v in entries.items():
+            self.__setattr__(k, v)
+
+
 class opts(object):
     def __init__(self):
         self.parser = argparse.ArgumentParser()
@@ -351,11 +357,6 @@ class opts(object):
                     'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225],
                     'dataset': 'kitti'},
         }
-
-        class Struct:
-            def __init__(self, entries):
-                for k, v in entries.items():
-                    self.__setattr__(k, v)
 
         opt = self.parse(args)
         dataset = Struct(default_dataset_info[opt.task])
