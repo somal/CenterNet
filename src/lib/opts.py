@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import argparse
 import os
 
@@ -230,7 +226,7 @@ class opts(object):
         self.parser.add_argument('--eval_oracle_dep', action='store_true',
                                  help='use ground truth depth.')
 
-    def parse(self, args=''):
+    def parse(self, args='') -> argparse.Namespace:
         if args == '':
             opt = self.parser.parse_args()
         else:
@@ -287,7 +283,8 @@ class opts(object):
             opt.load_model = os.path.join(model_path, 'model_last.pth')
         return opt
 
-    def update_dataset_info_and_set_heads(self, opt, dataset):
+    @staticmethod
+    def update_dataset_info_and_set_heads(opt: argparse.Namespace, dataset):
         input_h, input_w = dataset.default_resolution
         opt.mean, opt.std = dataset.mean, dataset.std
         opt.num_classes = dataset.num_classes
@@ -361,5 +358,5 @@ class opts(object):
         opt = self.parse(args)
         dataset = Struct(default_dataset_info[opt.task])
         opt.dataset = dataset.dataset
-        opt = self.update_dataset_info_and_set_heads(opt, dataset)
+        opt = opts.update_dataset_info_and_set_heads(opt, dataset)
         return opt

@@ -1,7 +1,4 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
+import argparse
 import os
 
 import torch
@@ -17,7 +14,7 @@ from src.lib.trains.train_factory import train_factory
 coco_annotation_folders = ('esaul_20', 'esaul_21', 'raspd-2_30', 'rcocs-1_12')
 
 
-def build_dataset(dataset_cls, opt, split):
+def build_dataset(dataset_cls, opt: argparse.Namespace, split):
     if opt.dataset == 'coco_cl' and opt.task == 'ctdet':
         new_dataset_instance = MultipleAnnotationsCOCOCL.build(dataset_cls, opt, split, coco_annotation_folders)
         return new_dataset_instance
@@ -25,7 +22,7 @@ def build_dataset(dataset_cls, opt, split):
         return dataset_cls(opt, split)
 
 
-def main(opt):
+def main(opt: argparse.Namespace):
     opt.data_dir = '/home/msokolov/PycharmProjects/bd_presales/cable_line/datasets/'
 
     torch.manual_seed(opt.seed)
@@ -112,5 +109,5 @@ def main(opt):
 
 
 if __name__ == '__main__':
-    opt = opts().parse()
+    opt = opts().parse()  # type: argparse.Namespace
     main(opt)
