@@ -1,5 +1,6 @@
 import argparse
 import os
+from dataclasses import dataclass
 from typing import List
 
 import cv2
@@ -12,6 +13,18 @@ from src.lib.opts import Opts
 image_ext = ('jpg', 'jpeg', 'png', 'webp')
 video_ext = ('mp4', 'mov', 'avi', 'mkv')
 time_stats = ('tot', 'load', 'pre', 'net', 'dec', 'post', 'merge')
+
+
+@dataclass
+class Line:
+    x1: int
+    y1: int
+    x2: int
+    y2: int
+
+    def __iter__(self):
+        for p in (self.x1, self.y1, self.x2, self.y2):
+            yield p
 
 
 def check_line_inter(line1, line2):
