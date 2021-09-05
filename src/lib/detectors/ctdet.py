@@ -1,8 +1,6 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
+import argparse
 import time
+from typing import Dict
 
 import numpy as np
 import torch
@@ -15,13 +13,14 @@ except ImportError:
 from src.lib.models.decode import ctdet_decode
 from src.lib.models.utils import flip_tensor
 from src.lib.utils.post_process import ctdet_post_process
-
 from src.lib.detectors.base_detector import BaseDetector
+from src.lib.utils.debugger import Debugger
 
 
 class CtdetDetector(BaseDetector):
-    def __init__(self, opt):
+    def __init__(self, opt: argparse.Namespace, vis_conf_thresholds: Dict[int, float]):
         super(CtdetDetector, self).__init__(opt)
+        self._vis_conf_thresholds = vis_conf_thresholds
 
     def process(self, images, return_time=False):
         with torch.no_grad():
@@ -70,7 +69,7 @@ class CtdetDetector(BaseDetector):
                 results[j] = results[j][keep_inds]
         return results
 
-    def debug(self, debugger, images, dets, output, scale=1):
+    def debug(self, debugger: Debugger, images, dets, output, scale=1):
         detection = dets.detach().cpu().numpy().copy()
         detection[:, :, :4] *= self.opt.down_ratio
         for i in range(1):
@@ -85,11 +84,10 @@ class CtdetDetector(BaseDetector):
                                            detection[i, k, 4],
                                            img_id='out_pred_{:.1f}'.format(scale))
 
-    def show_results(self, debugger, image, results):
+    def show_results(self, debugger: Debugger, image, results):
         debugger.add_img(image, img_id='ctdet')
-        threshs = {1: .1, 2: .1, 3: .3}
         for j in range(1, self.num_classes + 1):
             for bbox in results[j]:
-                if bbox[4] > threshs[j]:
+                if bbox[4] > self._vis_conf_thresholds[j]:
                     debugger.add_coco_bbox(bbox[:4], j - 1, bbox[4], img_id='ctdet')
-        debugger.show_all_imgs(pause=self.pause)
+        # debugger.show_all_imgs(pause=self.pause)

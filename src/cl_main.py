@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 from dataclasses import dataclass
 from typing import List, Tuple
@@ -7,12 +8,11 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
-from src.lib.detectors.detector_factory import detector_factory
+from src.lib.detectors.ctdet import CtdetDetector
 from src.lib.opts import Opts
 
 image_ext = ('jpg', 'jpeg', 'png', 'webp')
 video_ext = ('mp4', 'mov', 'avi', 'mkv')
-time_stats = ('tot', 'load', 'pre', 'net', 'dec', 'post', 'merge')
 
 
 @dataclass
@@ -56,62 +56,74 @@ def create_video_writer(fps: int, img_size: Tuple[int, int]):
     return cv2.VideoWriter('output.mp4', fourcc, fps, img_size)
 
 
-def demo(opt: argparse.Namespace):
-    FPS = 25
-    IMG_SIZE = (640, 480)
+class Polygon:
+    def __init__(self, points: List[List[int]]):
+        self._pts = points
+
+    def is_point_inside(self, x: int, y: int) -> bool:
+        return cv2.pointPolygonTest(contour=np.array(self._pts), pt=(x, y), measureDist=False)
+
+    @staticmethod
+    def read_polygons_from_json(video_path: str):
+        video_name = video_path.split('/')[-1]
+        polygons = json.load(open(f'{video_name}.json', 'r'))
+        return [Polygon(points) for points in polygons]
+
+    @staticmethod
+    def draw_polygons_on_image(polygons: List, image: np.array):
+        for polygon in polygons:
+            cv2.polylines(image, pts=[np.array(polygon._pts).reshape((-1, 1, 2))], isClosed=True, color=(255, 100, 0))
+
+
+def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
     cam = cv2.VideoCapture(opt.demo)
     assert cam.isOpened(), f'Video reading is broken'
-    out = create_video_writer(FPS, IMG_SIZE)
+    out = create_video_writer(fps, img_size)
 
+    # Configure model
     os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpus_str
     opt.debug = max(opt.debug, 1)  # TODO: learn it deeper
-    Detector = detector_factory[opt.task]
-    detector = Detector(opt)
-
+    # miner (1) -> .1
+    # seat (2) -> .3
+    vis_conf_thresholds = {1: .1, 2: .1, 3: .3}
+    detector = CtdetDetector(opt, vis_conf_thresholds=vis_conf_thresholds)
     detector.pause = False
-    # lines = [((90, 350), (420, 110)), ((358, 400), (550, 100))] # cl2.mp4
-    lines = [((261, 155), (330, 480)),
-             ((480, 480), (315, 135))]  # loopmarkers/ip:10.224.44.8_id:20_start:07:39:30.mp4
 
-    min_frames = 10 * FPS
-    inter_times_per_line = [[], []]
+    polygons = Polygon.read_polygons_from_json(opt.demo)
+
+    min_frames = 10 * fps
+    inter_times_per_polygon = [[], []]
     frame_number = 0
     rrr = {0: 'L', 1: 'R'}
     while True:
         frame_number += 1
-        # if frame_number > (19 * 60 + 14) * FPS:
-        #     print('Finish by time')
-        #     break
         is_opened, img = cam.read()
         if not is_opened:
             print('Finish by unabled images')
             break
-        # img = cv2.resize(img, (640, 480))
-        # cv2.imshow('input', img)
-        # [cv2.line(img, *line, color=(255, 255, 255), thickness=3) for line in lines]
+        img = cv2.resize(img, dsize=img_size)
         img_res, ret = detector.run(img)
 
-        # seat (2) -> .3
-        # miner (1) -> .1
-        threshold = {1: .3, 2: .3, 3: .3}
-        for class_id in (1, 2, 3):
+        for class_id in (1, 2):
             for bbox in ret['results'][class_id]:
-                if bbox[4] > threshold[class_id]:
+                if bbox[4] > vis_conf_thresholds[class_id]:
                     rect_bbox = tuple(map(int, bbox[:4]))
-                    for i in range(len(lines)):
-                        if (len(inter_times_per_line[i]) > 0
-                            and frame_number - inter_times_per_line[i][-1] >= min_frames) or \
-                                len(inter_times_per_line[i]) == 0:
+                    center = (rect_bbox[0] + rect_bbox[2]) // 2, (rect_bbox[1] + rect_bbox[3]) // 2
+                    for i in range(len(polygons)):
+                        if (len(inter_times_per_polygon[i]) > 0
+                            and frame_number - inter_times_per_polygon[i][-1] >= min_frames) or \
+                                len(inter_times_per_polygon[i]) == 0:
 
-                            if check_intersection_line_and_rect(lines[i], rect_bbox):
-                                inter_times_per_line[i].append(frame_number)
+                            if polygons[i].is_point_inside(*center):
+                                inter_times_per_polygon[i].append(frame_number)
                                 print(i, frame_number)
-
+        Polygon.draw_polygons_on_image(polygons, image=img_res)
+        cv2.imshow('output', img_res)
         # loopmaker_detected = False
         # for bbox in ret['results'][3]:
         #     if bbox[4] > .2:
         #         loopmaker_detected = True
-        #         print(f'Loopmaker detected, time: {frame_number / FPS}, thresh: {bbox[4]}')
+        #         print(f'Loopmaker detected, time: {frame_number / fps}, thresh: {bbox[4]}')
         #         break
         # if loopmaker_detected:
         #     break
@@ -121,19 +133,15 @@ def demo(opt: argparse.Namespace):
         #         max_confs[i] = max(max_confs[i], bbox[4])
         # print(max_confs)
 
-        for i in range(len(lines)):
-            gaps = gaps_from_inter_times(inter_times_per_line[i])
-            frame_diff = gaps[-1] / FPS if len(gaps) > 0 else 0
+        for i in range(len(polygons)):
+            gaps = gaps_from_inter_times(inter_times_per_polygon[i])
+            frame_diff = gaps[-1] / fps if len(gaps) > 0 else 0
             cv2.putText(img_res, f'Gap time {rrr[i]} {frame_diff:.2f}', (30, 50 * (i + 1)),
                         fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
-        cv2.putText(img_res, f'Count L {len(inter_times_per_line[0])}    R {len(inter_times_per_line[1])}',
-                    (30, 50 * (len(lines) + 1)),
+        cv2.putText(img_res, f'Count L {len(inter_times_per_polygon[0])}    R {len(inter_times_per_polygon[1])}',
+                    (30, 50 * (len(polygons) + 1)),
                     fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
-        # print(ret['results'])
         out.write(img_res)
-        time_str = ''
-        for stat in time_stats:
-            time_str = time_str + '{} {:.3f}s |'.format(stat, ret[stat])
         if cv2.waitKey(1) == ord(' '):
             print('Break the loop')
             break
@@ -144,10 +152,10 @@ def demo(opt: argparse.Namespace):
     # Plot time graphic
     print('Plotting')
     fig = plt.figure()
-    for i, times in enumerate(inter_times_per_line):
+    for i, times in enumerate(inter_times_per_polygon):
         y = gaps_from_inter_times(times)
-        X = np.array(times) / FPS
-        y = np.array(y) / FPS
+        X = np.array(times) / fps
+        y = np.array(y) / fps
         plt.plot(X, y, label=f'{rrr[i]}', marker='*')
     plt.legend()
     plt.xlabel('Time (sec)')
@@ -157,5 +165,8 @@ def demo(opt: argparse.Namespace):
 
 
 if __name__ == '__main__':
+    FPS = 25
+    IMG_SIZE = (640, 480)
+
     opt = Opts().init()
-    demo(opt)
+    demo(opt, fps=FPS, img_size=IMG_SIZE)

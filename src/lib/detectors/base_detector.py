@@ -30,6 +30,9 @@ class BaseDetector(object):
         self.opt = opt
         self.pause = True
 
+        self.debugger = Debugger(dataset=self.opt.dataset, ipynb=(self.opt.debug == 3),
+                                 theme=self.opt.debugger_theme)
+
     def pre_process(self, image, scale, meta=None):
         height, width = image.shape[0:2]
         new_height = int(height * scale)
@@ -78,8 +81,7 @@ class BaseDetector(object):
     def run(self, image_or_path_or_tensor, meta=None):
         load_time, pre_time, net_time, dec_time, post_time = 0, 0, 0, 0, 0
         merge_time, tot_time = 0, 0
-        debugger = Debugger(dataset=self.opt.dataset, ipynb=(self.opt.debug == 3),
-                            theme=self.opt.debugger_theme)
+
         start_time = time.time()
         pre_processed = False
         if isinstance(image_or_path_or_tensor, np.ndarray):
@@ -117,7 +119,7 @@ class BaseDetector(object):
             dec_time += decode_time - forward_time
 
             if self.opt.debug >= 2:
-                self.debug(debugger, images, dets, output, scale)
+                self.debug(self.debugger, images, dets, output, scale)
 
             dets = self.post_process(dets, meta, scale)
             torch.cuda.synchronize()
@@ -133,8 +135,8 @@ class BaseDetector(object):
         tot_time += end_time - start_time
 
         if self.opt.debug >= 1:
-            self.show_results(debugger, image, results)
+            self.show_results(self.debugger, image, results)
 
-        return debugger.imgs['ctdet'], {'results': results, 'tot': tot_time, 'load': load_time,
-                                        'pre': pre_time, 'net': net_time, 'dec': dec_time,
-                                        'post': post_time, 'merge': merge_time}
+        return self.debugger.imgs['ctdet'], {'results': results, 'tot': tot_time, 'load': load_time,
+                                             'pre': pre_time, 'net': net_time, 'dec': dec_time,
+                                             'post': post_time, 'merge': merge_time}
