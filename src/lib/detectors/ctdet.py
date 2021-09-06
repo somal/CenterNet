@@ -76,13 +76,13 @@ class CtdetDetector(BaseDetector):
             img = images[i].detach().cpu().numpy().transpose(1, 2, 0)
             img = ((img * self.std + self.mean) * 255).astype(np.uint8)
             pred = debugger.gen_colormap(output['hm'][i].detach().cpu().numpy())
-            debugger.add_blend_img(img, pred, 'pred_hm_{:.1f}'.format(scale))
-            debugger.add_img(img, img_id='out_pred_{:.1f}'.format(scale))
+            debugger.add_blend_img(img, pred, f'pred_hm_{scale:.1f}')
+            debugger.add_img(img, img_id=f'out_pred_{scale:.1f}')
             for k in range(len(dets[i])):
                 if detection[i, k, 4] > self.opt.center_thresh:
                     debugger.add_coco_bbox(detection[i, k, :4], detection[i, k, -1],
                                            detection[i, k, 4],
-                                           img_id='out_pred_{:.1f}'.format(scale))
+                                           img_id=f'out_pred_{scale:.1f}')
 
     def show_results(self, debugger: Debugger, image, results):
         debugger.add_img(image, img_id='ctdet')
