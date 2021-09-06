@@ -10,6 +10,7 @@ import numpy as np
 
 from src.lib.detectors.ctdet import CtdetDetector
 from src.lib.opts import Opts
+from src.tracking.tracker import Tracker
 
 image_ext = ('jpg', 'jpeg', 'png', 'webp')
 video_ext = ('mp4', 'mov', 'avi', 'mkv')
@@ -75,6 +76,16 @@ class Polygon:
             cv2.polylines(image, pts=[np.array(polygon._pts).reshape((-1, 1, 2))], isClosed=True, color=(255, 100, 0))
 
 
+def normalize_bbox_with_real_coords(bbox: List[float], img_size: Tuple[int, int]) -> List[float]:
+    """
+    :param bbox: coordinates in range [0, w/h] in (x1,y1,x2,y2,score) format
+    :param img_size: (w,h)
+    :return List[float]: coordinates in range [0, 1] in (x1,y1,x2,y2,score) format
+    """
+    assert len(bbox) == 5
+    return [bbox[0] / img_size[0], bbox[1] / img_size[1], bbox[2] / img_size[0], bbox[3] / img_size[1], bbox[4]]
+
+
 def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
     cam = cv2.VideoCapture(opt.demo)
     assert cam.isOpened(), f'Video reading is broken'
@@ -88,6 +99,7 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
     vis_conf_thresholds = {1: .1, 2: .1, 3: .3}
     detector = CtdetDetector(opt, vis_conf_thresholds=vis_conf_thresholds)
     detector.pause = False
+    tracker = Tracker()
 
     polygons = Polygon.read_polygons_from_json(opt.demo)
 
@@ -104,19 +116,28 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
         img = cv2.resize(img, dsize=img_size)
         img_res, ret = detector.run(img)
 
+        # Apply tracking
+        tracked_bboxes = {}
         for class_id in (1, 2):
-            for bbox in ret['results'][class_id]:
-                if bbox[4] > vis_conf_thresholds[class_id]:
-                    rect_bbox = tuple(map(int, bbox[:4]))
-                    center = (rect_bbox[0] + rect_bbox[2]) // 2, (rect_bbox[1] + rect_bbox[3]) // 2
-                    for i in range(len(polygons)):
-                        if (len(inter_times_per_polygon[i]) > 0
-                            and frame_number - inter_times_per_polygon[i][-1] >= min_frames) or \
-                                len(inter_times_per_polygon[i]) == 0:
+            good_score_detections = filter(lambda bbox: bbox[4] > vis_conf_thresholds[class_id], ret['results'][class_id])
+            bboxes_for_tracker = [normalize_bbox_with_real_coords(bbox, img_size) for bbox in good_score_detections]
+            tracked_bboxes[class_id] = tracker.update(bboxes_for_tracker)
 
-                            if polygons[i].is_point_inside(*center):
-                                inter_times_per_polygon[i].append(frame_number)
-                                print(i, frame_number)
+        # for class_id in (1, 2):
+        #     tracker.update(ret['results'][class_id])
+        #     for bbox in ret['results'][class_id]:
+        #         if bbox[4] > vis_conf_thresholds[class_id]:
+        #             rect_bbox = tuple(map(int, bbox[:4]))
+        #
+        #             center = (rect_bbox[0] + rect_bbox[2]) // 2, (rect_bbox[1] + rect_bbox[3]) // 2
+        #             for i in range(len(polygons)):
+        #                 if (len(inter_times_per_polygon[i]) > 0
+        #                     and frame_number - inter_times_per_polygon[i][-1] >= min_frames) or \
+        #                         len(inter_times_per_polygon[i]) == 0:
+        #
+        #                     if polygons[i].is_point_inside(*center):
+        #                         inter_times_per_polygon[i].append(frame_number)
+        #                         print(i, frame_number)
         Polygon.draw_polygons_on_image(polygons, image=img_res)
         cv2.imshow('output', img_res)
         # loopmaker_detected = False
