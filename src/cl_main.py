@@ -12,9 +12,6 @@ from src.lib.detectors.ctdet import CtdetDetector
 from src.lib.opts import Opts
 from src.tracking.tracker import Tracker
 
-image_ext = ('jpg', 'jpeg', 'png', 'webp')
-video_ext = ('mp4', 'mov', 'avi', 'mkv')
-
 
 @dataclass
 class Line:
@@ -26,35 +23,6 @@ class Line:
     def __iter__(self):
         for p in (self.x1, self.y1, self.x2, self.y2):
             yield p
-
-
-def check_line_inter(line1, line2):
-    img1 = np.zeros(shape=(640, 480), dtype=np.uint8)
-    img2 = np.zeros(shape=(640, 480), dtype=np.uint8)
-    cv2.line(img1, *line1, color=(255, 255, 255), thickness=3)
-    cv2.line(img2, *line2, color=(255, 255, 255), thickness=3)
-    return np.sum(np.logical_and(img1, img2)) > 0
-
-
-def check_intersection_line_and_rect(line, bbox):
-    x1, y1, x2, y2 = bbox[:4]
-    return any([check_line_inter(line, ((x1, y1), (x1, y2))),
-                check_line_inter(line, ((x2, y1), (x2, y2))),
-                check_line_inter(line, ((x1, y1), (x2, y1))),
-                check_line_inter(line, ((x1, y2), (x2, y2))),
-                ])
-
-
-def gaps_from_inter_times(times: List[float]):
-    y = [times[0]] if len(times) > 0 else []
-    for j in range(1, len(times)):
-        y.append((times[j] - times[j - 1]))
-    return np.array(y)
-
-
-def create_video_writer(fps: int, img_size: Tuple[int, int]):
-    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-    return cv2.VideoWriter('output.mp4', fourcc, fps, img_size)
 
 
 class Polygon:
@@ -79,6 +47,18 @@ class Polygon:
         return repr(self._pts)
 
 
+def gaps_from_inter_times(times: List[float]) -> np.array:
+    y = [times[0]] if len(times) > 0 else []
+    for j in range(1, len(times)):
+        y.append((times[j] - times[j - 1]))
+    return np.array(y)
+
+
+def create_video_writer(fps: int, img_size: Tuple[int, int]) -> cv2.VideoWriter:
+    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+    return cv2.VideoWriter('output.mp4', fourcc, fps, img_size)
+
+
 def convert_real_to_norm_bbox_coords(bbox: List[float], img_size: Tuple[int, int]) -> List[float]:
     """
     :param bbox: coordinates in range [0, w/h] in (x1,y1,x2,y2, score) format
@@ -98,6 +78,18 @@ def convert_norm_to_real_bbox_coords(bbox: List[float], img_size: Tuple[int, int
     assert len(bbox) == 4
     return [int(bbox[0] * img_size[0]), int(bbox[1] * img_size[1]),
             int(bbox[2] * img_size[0]), int(bbox[3] * img_size[1])]
+
+
+def handle_times_gap(polygons: List[Polygon], inter_times_per_polygon: List[List[float]],
+                     img_res: np.ndarray, fps: float):
+    for i in range(len(polygons)):
+        gaps = gaps_from_inter_times(inter_times_per_polygon[i])
+        frame_diff = gaps[-1] / fps if len(gaps) > 0 else 0
+        cv2.putText(img_res, f'Gap time {i} {frame_diff:.2f}', (30, 50 * (i + 1)),
+                    fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
+    cv2.putText(img_res, f'Count L {len(inter_times_per_polygon[0])}    R {len(inter_times_per_polygon[1])}',
+                (30, 50 * (len(polygons) + 1)),
+                fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
 
 
 def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
@@ -120,7 +112,6 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
                         for class_id in activated_classes}
 
     polygons = Polygon.read_polygons_from_json(opt.demo)
-    print(polygons)
 
     inter_times_per_polygon = [[], []]
     frame_number = 0
@@ -144,6 +135,7 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
                                   good_score_detections]
             tracked_bboxes[class_id] = tracker_by_class[class_id].update(bboxes_for_tracker)
 
+        # Analyze tracks
         for class_id in activated_classes:
             for track_id in tracked_bboxes[class_id]:
                 # Draw results for debugging
@@ -164,15 +156,7 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
                             handled_tracks.add(track_id)
                             print(f'Pol: {i} Track: {track_id}, center: {center}')
                             break
-
-        for i in range(len(polygons)):
-            gaps = gaps_from_inter_times(inter_times_per_polygon[i])
-            frame_diff = gaps[-1] / fps if len(gaps) > 0 else 0
-            cv2.putText(img_res, f'Gap time {rrr[i]} {frame_diff:.2f}', (30, 50 * (i + 1)),
-                        fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
-        cv2.putText(img_res, f'Count L {len(inter_times_per_polygon[0])}    R {len(inter_times_per_polygon[1])}',
-                    (30, 50 * (len(polygons) + 1)),
-                    fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
+        handle_times_gap(polygons, inter_times_per_polygon, img_res, fps)
 
         Polygon.draw_polygons_on_image(polygons, image=img_res)
         cv2.imshow('output', img_res)
