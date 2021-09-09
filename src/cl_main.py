@@ -62,7 +62,7 @@ class Polygon:
         self._pts = points
 
     def is_point_inside(self, x: int, y: int) -> bool:
-        return cv2.pointPolygonTest(contour=np.array(self._pts), pt=(x, y), measureDist=False)
+        return cv2.pointPolygonTest(contour=np.array(self._pts), pt=(x, y), measureDist=False) >= 0
 
     @staticmethod
     def read_polygons_from_json(video_path: str):
@@ -74,6 +74,9 @@ class Polygon:
     def draw_polygons_on_image(polygons: List, image: np.array):
         for polygon in polygons:
             cv2.polylines(image, pts=[np.array(polygon._pts).reshape((-1, 1, 2))], isClosed=True, color=(255, 100, 0))
+
+    def __repr__(self):
+        return repr(self._pts)
 
 
 def convert_real_to_norm_bbox_coords(bbox: List[float], img_size: Tuple[int, int]) -> List[float]:
@@ -109,19 +112,20 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
     # seat (2) -> .3
     # loopmarker (3)
     vis_conf_thresholds = {1: .1, 2: .1, 3: .3}
-    activated_classes = tuple([1, 2])
+    activated_classes = tuple([2])
     color_by_class = {1: (0, 0, 255), 2: (255, 255, 255), 3: (255, 0, 0)}
     detector = CtdetDetector(opt, vis_conf_thresholds=vis_conf_thresholds)
     detector.pause = False
-    tracker_by_class = {class_id: Tracker(min_hits_to_track=3, iou_threshold=.1, nonactive_track_max_times=10)
+    tracker_by_class = {class_id: Tracker(min_hits_to_track=10, iou_threshold=.1, nonactive_track_max_times=30)
                         for class_id in activated_classes}
 
     polygons = Polygon.read_polygons_from_json(opt.demo)
+    print(polygons)
 
-    min_frames = 10 * fps
     inter_times_per_polygon = [[], []]
     frame_number = 0
     rrr = {0: 'L', 1: 'R'}
+    handled_tracks = set([])
     while True:
         frame_number += 1
         is_opened, img = cam.read()
@@ -142,6 +146,7 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
 
         for class_id in activated_classes:
             for track_id in tracked_bboxes[class_id]:
+                # Draw results for debugging
                 norm_bbox = tracked_bboxes[class_id][track_id]
                 real_bbox = convert_norm_to_real_bbox_coords(norm_bbox, img_size=img_size)
                 cv2.rectangle(img_res, real_bbox[:2], real_bbox[2:4], color=color_by_class[class_id], thickness=2)
@@ -150,23 +155,15 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
                             real_bbox[:2],
                             fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
 
-        # for class_id in (1, 2):
-        #     tracker.update(ret['results'][class_id])
-        #     for bbox in ret['results'][class_id]:
-        #         if bbox[4] > vis_conf_thresholds[class_id]:
-        #             rect_bbox = tuple(map(int, bbox[:4]))
-        #
-        #             center = (rect_bbox[0] + rect_bbox[2]) // 2, (rect_bbox[1] + rect_bbox[3]) // 2
-        #             for i in range(len(polygons)):
-        #                 if (len(inter_times_per_polygon[i]) > 0
-        #                     and frame_number - inter_times_per_polygon[i][-1] >= min_frames) or \
-        #                         len(inter_times_per_polygon[i]) == 0:
-        #
-        #                     if polygons[i].is_point_inside(*center):
-        #                         inter_times_per_polygon[i].append(frame_number)
-        #                         print(i, frame_number)
-        Polygon.draw_polygons_on_image(polygons, image=img_res)
-        cv2.imshow('output', img_res)
+                # Find intersections
+                if not track_id in handled_tracks:
+                    center = (real_bbox[0] + real_bbox[2]) // 2, (real_bbox[1] + real_bbox[3]) // 2
+                    for i in range(len(polygons)):
+                        if polygons[i].is_point_inside(*center):
+                            inter_times_per_polygon[i].append(frame_number)
+                            handled_tracks.add(track_id)
+                            print(f'Pol: {i} Track: {track_id}, center: {center}')
+                            break
 
         for i in range(len(polygons)):
             gaps = gaps_from_inter_times(inter_times_per_polygon[i])
@@ -176,6 +173,9 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
         cv2.putText(img_res, f'Count L {len(inter_times_per_polygon[0])}    R {len(inter_times_per_polygon[1])}',
                     (30, 50 * (len(polygons) + 1)),
                     fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
+
+        Polygon.draw_polygons_on_image(polygons, image=img_res)
+        cv2.imshow('output', img_res)
         out.write(img_res)
         if cv2.waitKey(1) == ord(' '):
             print('Break the loop')
