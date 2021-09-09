@@ -241,7 +241,7 @@ class Sort(object):
         for t in reversed(to_del):
             self.trackers.pop(t)
         matched, unmatched_detections, unmatched_trackers = associate_detections_to_trackers(detections, tracker_pred,
-                                                                                   self.iou_threshold)
+                                                                                             self.iou_threshold)
 
         # Update matched trackers with assigned detections
         for m in matched:

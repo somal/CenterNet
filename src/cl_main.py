@@ -76,14 +76,25 @@ class Polygon:
             cv2.polylines(image, pts=[np.array(polygon._pts).reshape((-1, 1, 2))], isClosed=True, color=(255, 100, 0))
 
 
-def normalize_bbox_with_real_coords(bbox: List[float], img_size: Tuple[int, int]) -> List[float]:
+def convert_real_to_norm_bbox_coords(bbox: List[float], img_size: Tuple[int, int]) -> List[float]:
     """
-    :param bbox: coordinates in range [0, w/h] in (x1,y1,x2,y2,score) format
+    :param bbox: coordinates in range [0, w/h] in (x1,y1,x2,y2, score) format
     :param img_size: (w,h)
-    :return List[float]: coordinates in range [0, 1] in (x1,y1,x2,y2,score) format
+    :return List[float]: coordinates in range [0, 1] in (x1,y1,x2,y2, score) format
     """
     assert len(bbox) == 5
     return [bbox[0] / img_size[0], bbox[1] / img_size[1], bbox[2] / img_size[0], bbox[3] / img_size[1], bbox[4]]
+
+
+def convert_norm_to_real_bbox_coords(bbox: List[float], img_size: Tuple[int, int]) -> List[int]:
+    """
+    :param bbox: coordinates in range [0, 1] in (x1,y1,x2,y2, score) format
+    :param img_size: (w,h)
+    :return List[float]: coordinates in range [0, w/h] in (x1,y1,x2,y2, score) format
+    """
+    assert len(bbox) == 4
+    return [int(bbox[0] * img_size[0]), int(bbox[1] * img_size[1]),
+            int(bbox[2] * img_size[0]), int(bbox[3] * img_size[1])]
 
 
 def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
@@ -96,10 +107,14 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
     opt.debug = max(opt.debug, 1)  # TODO: learn it deeper
     # miner (1) -> .1
     # seat (2) -> .3
+    # loopmarker (3)
     vis_conf_thresholds = {1: .1, 2: .1, 3: .3}
+    activated_classes = tuple([1, 2])
+    color_by_class = {1: (0, 0, 255), 2: (255, 255, 255), 3: (255, 0, 0)}
     detector = CtdetDetector(opt, vis_conf_thresholds=vis_conf_thresholds)
     detector.pause = False
-    tracker = Tracker()
+    tracker_by_class = {class_id: Tracker(min_hits_to_track=3, iou_threshold=.1, nonactive_track_max_times=10)
+                        for class_id in activated_classes}
 
     polygons = Polygon.read_polygons_from_json(opt.demo)
 
@@ -118,10 +133,22 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
 
         # Apply tracking
         tracked_bboxes = {}
-        for class_id in (1, 2):
-            good_score_detections = filter(lambda bbox: bbox[4] > vis_conf_thresholds[class_id], ret['results'][class_id])
-            bboxes_for_tracker = [normalize_bbox_with_real_coords(bbox, img_size) for bbox in good_score_detections]
-            tracked_bboxes[class_id] = tracker.update(bboxes_for_tracker)
+        for class_id in activated_classes:
+            good_score_detections = list(filter(lambda bbox: bbox[4] >= vis_conf_thresholds[class_id],
+                                                ret['results'][class_id]))
+            bboxes_for_tracker = [convert_real_to_norm_bbox_coords(bbox, img_size) for bbox in
+                                  good_score_detections]
+            tracked_bboxes[class_id] = tracker_by_class[class_id].update(bboxes_for_tracker)
+
+        for class_id in activated_classes:
+            for track_id in tracked_bboxes[class_id]:
+                norm_bbox = tracked_bboxes[class_id][track_id]
+                real_bbox = convert_norm_to_real_bbox_coords(norm_bbox, img_size=img_size)
+                cv2.rectangle(img_res, real_bbox[:2], real_bbox[2:4], color=color_by_class[class_id], thickness=2)
+                cv2.putText(img_res,
+                            f'{track_id}',
+                            real_bbox[:2],
+                            fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
 
         # for class_id in (1, 2):
         #     tracker.update(ret['results'][class_id])
@@ -140,19 +167,6 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
         #                         print(i, frame_number)
         Polygon.draw_polygons_on_image(polygons, image=img_res)
         cv2.imshow('output', img_res)
-        # loopmaker_detected = False
-        # for bbox in ret['results'][3]:
-        #     if bbox[4] > .2:
-        #         loopmaker_detected = True
-        #         print(f'Loopmaker detected, time: {frame_number / fps}, thresh: {bbox[4]}')
-        #         break
-        # if loopmaker_detected:
-        #     break
-        # max_confs = {1: 0, 3: 0}
-        # for i in max_confs.keys():
-        #     for bbox in ret['results'][i]:
-        #         max_confs[i] = max(max_confs[i], bbox[4])
-        # print(max_confs)
 
         for i in range(len(polygons)):
             gaps = gaps_from_inter_times(inter_times_per_polygon[i])
