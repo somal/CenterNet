@@ -27,11 +27,11 @@ def load_model(model, model_path, optimizer=None, resume=False,
                lr=None, lr_step=None):
     start_epoch = 0
     checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
-    print('loaded {}, epoch {}'.format(model_path, checkpoint['epoch']))
+    print(f'loaded {model_path}, epoch {checkpoint["epoch"]}')
     state_dict_ = checkpoint['state_dict']
     state_dict = {}
 
-    # convert data_parallal to model
+    # convert data_parallel to model
     for k in state_dict_:
         if k.startswith('module') and not k.startswith('module_list'):
             state_dict[k[7:]] = state_dict_[k]

@@ -69,7 +69,7 @@ class COCO_CL_CTDet(data.Dataset):
         # print(f'Loaded {split} {self.num_samples} samples with classes {self.class_name}')
 
     def __len__(self):
-        return 1  # self.num_samples
+        return self.num_samples
 
     def get_stats_by_category(self) -> Dict[int, int]:
         return self._cat_stats
@@ -78,12 +78,13 @@ class COCO_CL_CTDet(data.Dataset):
     def _to_float(x):
         return float(f"{x:.2f}")
 
-    def convert_eval_format(self, all_bboxes):
+    @staticmethod
+    def convert_eval_format(all_bboxes: Dict[int, Dict[int, List]], category_by_class: Dict[int, int]) -> List[Dict]:
         # import pdb; pdb.set_trace()
         detections = []
         for image_id in all_bboxes:
             for cls_ind in all_bboxes[image_id]:
-                category_id = self._valid_ids[cls_ind - 1]
+                category_id = category_by_class[cls_ind - 1]
                 for bbox in all_bboxes[image_id][cls_ind]:
                     bbox[2] -= bbox[0]
                     bbox[3] -= bbox[1]
@@ -94,24 +95,16 @@ class COCO_CL_CTDet(data.Dataset):
                         "image_id": int(image_id),
                         "category_id": int(category_id),
                         "bbox": bbox_out,
-                        "score": float("{:.2f}".format(score))
+                        "score": COCO_CL_CTDet._to_float(score)
                     }
-                    # if len(bbox) > 5:
-                    #     extreme_points = list(map(COCO_CL_CTDet._to_float, bbox[5:13]))
-                    #     detection["extreme_points"] = extreme_points
+                    # if score > .5:
                     detections.append(detection)
         return detections
 
-    def save_results(self, results, save_dir):
-        json.dump(self.convert_eval_format(results),
-                  open(f'{save_dir}/results.json', 'w'))
-
     def run_eval(self, results, save_dir):
-        # result_json = os.path.join(save_dir, "results.json")
-        # detections  = self.convert_eval_format(results)
-        # json.dump(detections, open(result_json, "w"))
-        self.save_results(results, save_dir)
-        coco_dets = self.coco.loadRes('{}/results.json'.format(save_dir))
+        converted_results = self.convert_eval_format(results, category_by_class=self._valid_ids)
+        json.dump(converted_results, open(f'{save_dir}/results.json', 'w'))
+        coco_dets = self.coco.loadRes(f'{save_dir}/results.json')
         coco_eval = COCOeval(self.coco, coco_dets, "bbox")
         coco_eval.evaluate()
         coco_eval.accumulate()
@@ -251,9 +244,8 @@ class COCO_CL_CTDet(data.Dataset):
 
 class MultipleAnnotationsCOCOCL:
     @staticmethod
-    def build(combined_dataset_cls, opt, split: str, coco_annotation_folders: Iterable[str]):
-        assert issubclass(combined_dataset_cls, COCO_CL_CTDet)
-        datasets = [combined_dataset_cls(opt, split, annotation_folder=ann_path) for ann_path in
+    def build(opt, split: str, coco_annotation_folders: Iterable[str]):
+        datasets = [COCO_CL_CTDet(opt, split, annotation_folder=ann_path) for ann_path in
                     coco_annotation_folders]
         dataset = data.ConcatDataset(datasets=datasets)
 

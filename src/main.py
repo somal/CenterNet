@@ -16,7 +16,7 @@ coco_annotation_folders = ('esaul_20', 'esaul_21', 'raspd-2_30', 'rcocs-1_12')
 
 def build_dataset(dataset_cls, opt: argparse.Namespace, split):
     if opt.dataset == 'coco_cl' and opt.task == 'ctdet':
-        new_dataset_instance = MultipleAnnotationsCOCOCL.build(dataset_cls, opt, split, coco_annotation_folders)
+        new_dataset_instance = MultipleAnnotationsCOCOCL.build(opt, split, coco_annotation_folders)
         return new_dataset_instance
     else:
         return dataset_cls(opt, split)

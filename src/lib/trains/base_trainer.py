@@ -1,8 +1,5 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import time
+from typing import List
 
 import torch
 from progress.bar import Bar
@@ -31,7 +28,7 @@ class BaseTrainer(object):
         self.loss_stats, self.loss = self._get_losses(opt)
         self.model_with_loss = ModelWithLoss(model, self.loss)
 
-    def set_device(self, gpus, chunk_sizes, device):
+    def set_device(self, gpus: List, chunk_sizes: List[int], device: torch.device):
         if len(gpus) > 1:
             self.model_with_loss = DataParallel(
                 self.model_with_loss, device_ids=gpus,
@@ -44,7 +41,7 @@ class BaseTrainer(object):
                 if isinstance(v, torch.Tensor):
                     state[k] = v.to(device=device, non_blocking=True)
 
-    def run_epoch(self, phase, epoch, data_loader):
+    def run_epoch(self, phase: str, epoch: int, data_loader: torch.utils.data.DataLoader):
         model_with_loss = self.model_with_loss
         if phase == 'train':
             model_with_loss.train()
@@ -59,7 +56,7 @@ class BaseTrainer(object):
         data_time, batch_time = AverageMeter(), AverageMeter()
         avg_loss_stats = {l: AverageMeter() for l in self.loss_stats}
         num_iters = len(data_loader) if opt.num_iters < 0 else opt.num_iters
-        bar = Bar('{}/{}'.format(opt.task, opt.exp_id), max=num_iters)
+        bar = Bar(f'{opt.task}/{opt.exp_id}', max=num_iters)
         end = time.time()
         for iter_id, batch in enumerate(data_loader):
             if iter_id >= num_iters:
