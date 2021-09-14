@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 from src.lib.utils.ddd_utils import compute_box_3d, project_to_image, draw_box_3d
-from src.lib.datasets.dataset.coco_cl import COCO_CL
+from src.lib.datasets.dataset.coco_cl_ctdet import COCO_CL_CTDet
 
 
 class Debugger(object):
@@ -45,7 +45,7 @@ class Debugger(object):
                               (255, 0, 0), (0, 0, 255), (255, 0, 0), (0, 0, 255),
                               (255, 0, 0), (0, 0, 255)]
         elif dataset == 'coco_cl':
-            self.names = COCO_CL.class_name
+            self.names = COCO_CL_CTDet.class_name
         elif num_classes == 80 or dataset == 'coco':
             self.names = coco_class_name
         elif num_classes == 20 or dataset == 'pascal':

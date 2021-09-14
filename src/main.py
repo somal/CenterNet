@@ -4,7 +4,7 @@ import os
 import torch
 from torch.utils import data
 
-from src.lib.datasets.dataset.coco_cl import MultipleAnnotationsCOCOCL
+from src.lib.datasets.dataset.coco_cl_ctdet import MultipleAnnotationsCOCOCL
 from src.lib.datasets.dataset_factory import get_dataset
 from src.lib.logger import Logger
 from src.lib.models.model import create_model, load_model, save_model

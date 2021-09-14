@@ -1,7 +1,6 @@
-
+from src.lib.datasets.dataset.coco_cl_ctdet import COCO_CL_CTDet
 
 from src.lib.datasets.dataset.coco import COCO
-from src.lib.datasets.dataset.coco_cl import COCO_CL
 from src.lib.datasets.dataset.coco_hp import COCOHP
 from src.lib.datasets.dataset.kitti import KITTI
 from src.lib.datasets.dataset.pascal import PascalVOC
@@ -12,7 +11,6 @@ from src.lib.datasets.sample.multi_pose import MultiPoseDataset
 
 dataset_factory = {
     'coco': COCO,
-    'coco_cl': COCO_CL,
     'pascal': PascalVOC,
     'kitti': KITTI,
     'coco_hp': COCOHP
@@ -27,6 +25,9 @@ _sample_factory = {
 
 
 def get_dataset(dataset: str, task: str):
+    if dataset == 'coco_cl':
+        return COCO_CL_CTDet
+
     class CombinedDataset(dataset_factory[dataset], _sample_factory[task]):
         pass
 
