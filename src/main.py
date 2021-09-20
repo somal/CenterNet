@@ -78,18 +78,18 @@ def main(opt: argparse.Namespace):
     for epoch in range(start_epoch + 1, opt.num_epochs + 1):
         mark = epoch if opt.save_all else 'last'
         log_dict_train, _ = trainer.train(epoch, train_loader)
-        logger.write('epoch: {} |'.format(epoch))
+        logger.write(f'epoch: {epoch} |')
         for k, v in log_dict_train.items():
-            logger.scalar_summary('train_{}'.format(k), v, epoch)
-            logger.write('{} {:8f} | '.format(k, v))
+            logger.scalar_summary(f'train_{k}', v, epoch)
+            logger.write(f'{k} {v:8f} | ')
         if opt.val_intervals > 0 and epoch % opt.val_intervals == 0:
-            save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)),
+            save_model(os.path.join(opt.save_dir, f'model_{mark}.pth'),
                        epoch, model, optimizer)
             with torch.no_grad():
                 log_dict_val, preds = trainer.val(epoch, val_loader)
             for k, v in log_dict_val.items():
-                logger.scalar_summary('val_{}'.format(k), v, epoch)
-                logger.write('{} {:8f} | '.format(k, v))
+                logger.scalar_summary(f'val_{k}', v, epoch)
+                logger.write(f'{k} {v:8f} | ')
             if log_dict_val[opt.metric] < best:
                 best = log_dict_val[opt.metric]
                 save_model(os.path.join(opt.save_dir, 'model_best.pth'),
@@ -99,7 +99,7 @@ def main(opt: argparse.Namespace):
                        epoch, model, optimizer)
         logger.write('\n')
         if epoch in opt.lr_step:
-            save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)),
+            save_model(os.path.join(opt.save_dir, f'model_{epoch}.pth'),
                        epoch, model, optimizer)
             lr = opt.lr * (0.1 ** (opt.lr_step.index(epoch) + 1))
             print('Drop LR to', lr)
