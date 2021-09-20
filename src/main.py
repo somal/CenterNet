@@ -48,19 +48,11 @@ def main(opt: argparse.Namespace):
     trainer.set_device(opt.gpus, opt.chunk_sizes, opt.device)
 
     print('Setting up data...')
-    val_loader = torch.utils.data.DataLoader(
-        dataset=build_dataset(Dataset, opt, 'val'),
-        batch_size=1,
-        shuffle=False,
-        num_workers=1,
-        pin_memory=True
-    )
 
     if opt.test:
         print('Start testing')
-        _, preds = trainer.val(0, val_loader)
-        # val_loader.dataset.run_eval(preds, opt.save_dir)
-        [d.run_eval(preds, opt.save_dir) for d in val_loader.dataset.datasets]
+        concat_dataset = build_dataset(Dataset, opt, 'val')
+        MultipleAnnotationsCOCOCL.run_eval(trainer=trainer, concat_dataset=concat_dataset, opt=opt)
         return
 
     train_loader = torch.utils.data.DataLoader(
@@ -70,6 +62,14 @@ def main(opt: argparse.Namespace):
         num_workers=opt.num_workers,
         pin_memory=True,
         drop_last=True
+    )
+
+    val_loader = torch.utils.data.DataLoader(
+        dataset=build_dataset(Dataset, opt, 'val'),
+        batch_size=1,
+        shuffle=False,
+        num_workers=1,
+        pin_memory=True
     )
 
     print('Starting training...')

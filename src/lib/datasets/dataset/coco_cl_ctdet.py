@@ -11,6 +11,7 @@ import pycocotools.coco as coco
 from pycocotools.cocoeval import COCOeval
 from torch.utils import data
 
+from src.lib.trains.base_trainer import BaseTrainer
 from src.lib.utils.image import color_aug
 from src.lib.utils.image import draw_dense_reg
 from src.lib.utils.image import gaussian_radius, draw_umich_gaussian, draw_msra_gaussian
@@ -51,18 +52,22 @@ class COCO_CL_CTDet(data.Dataset):
         self.img_dir = os.path.join(self.data_dir, annotation_folder, '1')
         self.annot_path = os.path.join(self.img_dir, 'lbl', 'COCO_annotation.json')
         self.coco = coco.COCO(self.annot_path)
-        self._valid_ids = self.coco.getCatIds(catNms=self.class_name)
+        self._annotated_cat_ids = self.coco.getCatIds(catNms=self.class_name)
 
         self._cat_stats = {}  # type: Dict[int, int]
-        for i, cat_id in enumerate(self._valid_ids):
+        for i, cat_id in enumerate(self._annotated_cat_ids):
             img_ids = self.coco.getImgIds(catIds=cat_id)
             self.images.update(set(img_ids))
 
             # Collect statistics
             class_name = self.class_name[i]
             self._cat_stats[class_name] = len(img_ids)
-        assert isinstance(self._valid_ids, list) and isinstance(self._valid_ids[0], int)
-        self.cat_ids = {v: i for i, v in enumerate(self._valid_ids)}  # type: Dict[int]
+        assert isinstance(self._annotated_cat_ids, list) and isinstance(self._annotated_cat_ids[0], int)
+        # Map classes and categories (which can be different from makrup to markup)
+        annotated_class_ids = range(len(self._annotated_cat_ids))
+        self._coco_category_id_to_class_id = dict(zip(self._annotated_cat_ids, annotated_class_ids))
+        self._class_id_to_coco_category_id = dict(zip(annotated_class_ids, self._annotated_cat_ids))
+
         self.num_samples = len(self.images)  # type: int
         self.images = list(self.images)  # type: List[int]
 
@@ -84,25 +89,26 @@ class COCO_CL_CTDet(data.Dataset):
         detections = []
         for image_id in all_bboxes:
             for cls_ind in all_bboxes[image_id]:
-                category_id = category_by_class[cls_ind - 1]
-                for bbox in all_bboxes[image_id][cls_ind]:
-                    bbox[2] -= bbox[0]
-                    bbox[3] -= bbox[1]
-                    score = bbox[4]
-                    bbox_out = list(map(COCO_CL_CTDet._to_float, bbox[0:4]))
+                category_id = category_by_class.get(cls_ind - 1)
+                if category_id is not None:
+                    for bbox in all_bboxes[image_id][cls_ind]:
+                        bbox[2] -= bbox[0]
+                        bbox[3] -= bbox[1]
+                        score = bbox[4]
+                        bbox_out = list(map(COCO_CL_CTDet._to_float, bbox[0:4]))
 
-                    detection = {
-                        "image_id": int(image_id),
-                        "category_id": int(category_id),
-                        "bbox": bbox_out,
-                        "score": COCO_CL_CTDet._to_float(score)
-                    }
-                    # if score > .5:
-                    detections.append(detection)
+                        detection = {
+                            "image_id": int(image_id),
+                            "category_id": int(category_id),
+                            "bbox": bbox_out,
+                            "score": COCO_CL_CTDet._to_float(score)
+                        }
+                        # if score > .5:
+                        detections.append(detection)
         return detections
 
     def run_eval(self, results, save_dir):
-        converted_results = self.convert_eval_format(results, category_by_class=self._valid_ids)
+        converted_results = self.convert_eval_format(results, category_by_class=self._class_id_to_coco_category_id)
         json.dump(converted_results, open(f'{save_dir}/results.json', 'w'))
         coco_dets = self.coco.loadRes(f'{save_dir}/results.json')
         coco_eval = COCOeval(self.coco, coco_dets, "bbox")
@@ -196,7 +202,7 @@ class COCO_CL_CTDet(data.Dataset):
         for k in range(num_objs):
             ann = anns[k]
             bbox = COCO_CL_CTDet._coco_box_to_bbox(ann['bbox'])
-            cls_id = int(self.cat_ids[ann['category_id']])
+            cls_id = int(self._coco_category_id_to_class_id[ann['category_id']])
             if flipped:
                 bbox[[0, 2]] = width - bbox[[2, 0]] - 1
             bbox[:2] = affine_transform(bbox[:2], trans_output)
@@ -260,3 +266,20 @@ class MultipleAnnotationsCOCOCL:
             current_stat = Counter(current_stat)
             stats += current_stat
         return dict(stats)
+
+    @staticmethod
+    def dataset_to_val_dataloader(dataset: data.Dataset):
+        return data.DataLoader(
+            dataset=dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=1,
+            pin_memory=False
+        )
+
+    @staticmethod
+    def run_eval(trainer: BaseTrainer, concat_dataset: data.ConcatDataset, opt: argparse.Namespace):
+        for dataset in concat_dataset.datasets:
+            val_data_loader = MultipleAnnotationsCOCOCL.dataset_to_val_dataloader(dataset)
+            ret, preds = trainer.val(0, val_data_loader)
+            dataset.run_eval(preds, opt.save_dir)
