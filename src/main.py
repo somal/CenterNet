@@ -9,7 +9,7 @@ from src.lib.datasets.dataset_factory import get_dataset
 from src.lib.logger import Logger
 from src.lib.models.model import create_model, load_model, save_model
 from src.lib.opts import Opts
-from src.lib.trains.train_factory import train_factory
+from src.lib.trains.ctdet import CtdetTrainer
 
 coco_annotation_folders = ('esaul_20', 'esaul_21', 'raspd-2_30', 'rcocs-1_12')
 
@@ -44,8 +44,7 @@ def main(opt: argparse.Namespace):
         model, optimizer, start_epoch = load_model(
             model, opt.load_model, optimizer, opt.resume, opt.lr, opt.lr_step)
 
-    Trainer = train_factory[opt.task]
-    trainer = Trainer(opt, model, optimizer)
+    trainer = CtdetTrainer(opt, model, optimizer)
     trainer.set_device(opt.gpus, opt.chunk_sizes, opt.device)
 
     print('Setting up data...')
