@@ -80,20 +80,48 @@ def convert_norm_to_real_bbox_coords(bbox: List[float], img_size: Tuple[int, int
             int(bbox[2] * img_size[0]), int(bbox[3] * img_size[1])]
 
 
-def handle_times_gap(polygons: List[Polygon], inter_times_per_polygon: List[List[float]],
+def handle_times_gap(polygons: List[Polygon], inter_fn_per_polygon: List[List[float]],
                      img_res: np.ndarray, fps: float):
     for i in range(len(polygons)):
-        gaps = gaps_from_inter_times(inter_times_per_polygon[i])
+        gaps = gaps_from_inter_times(inter_fn_per_polygon[i])
         frame_diff = gaps[-1] / fps if len(gaps) > 0 else 0
         cv2.putText(img_res, f'Gap time {i} {frame_diff:.2f}', (30, 50 * (i + 1)),
                     fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
-    cv2.putText(img_res, f'Count L {len(inter_times_per_polygon[0])}    R {len(inter_times_per_polygon[1])}',
+    cv2.putText(img_res, f'Count L {len(inter_fn_per_polygon[0])}    R {len(inter_fn_per_polygon[1])}',
                 (30, 50 * (len(polygons) + 1)),
                 fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
 
 
-def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
+def plot_time_graphics(inter_fn_per_polygon: List[List[float]], fps: int):
+    print('Plotting')
+    fig = plt.figure()
+    for i, times in enumerate(inter_fn_per_polygon):
+        y = gaps_from_inter_times(times)
+        X = np.array(times) / fps
+        y = np.array(y) / fps
+        plt.plot(X, y, label=f'{i}', marker='*')
+    plt.legend()
+    plt.xlabel('Time (sec)')
+    plt.ylabel('Gap (sec)')
+    plt.title('Gaps along time')
+    fig.savefig('cl_times.png')
+
+
+def save_inter_times_to_record(inter_fn_per_polygon: List[List[float]], filename: str, fps: float):
+    print(inter_fn_per_polygon)
+    merged_array = []
+    for i in range(len(inter_fn_per_polygon)):
+        merged_array += inter_fn_per_polygon[i]
+
+    merged_array.sort()
+    merged_array = list(np.array(merged_array) / fps)
+    with open(filename, 'w') as f:
+        f.write('\n'.join(map(str, merged_array)))
+
+
+def demo(opt: argparse.Namespace, img_size: Tuple[int, int]):
     cam = cv2.VideoCapture(opt.demo)
+    fps = cam.get(cv2.CAP_PROP_FPS)
     assert cam.isOpened(), f'Video reading is broken'
     out = create_video_writer(fps, img_size)
 
@@ -113,9 +141,8 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
 
     polygons = Polygon.read_polygons_from_json(opt.demo)
 
-    inter_times_per_polygon = [[], []]
+    inter_fn_per_polygon = [[] for _ in range(len(polygons))]
     frame_number = 0
-    rrr = {0: 'L', 1: 'R'}
     handled_tracks = set([])
     while True:
         frame_number += 1
@@ -152,11 +179,11 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
                     center = (real_bbox[0] + real_bbox[2]) // 2, (real_bbox[1] + real_bbox[3]) // 2
                     for i in range(len(polygons)):
                         if polygons[i].is_point_inside(*center):
-                            inter_times_per_polygon[i].append(frame_number)
+                            inter_fn_per_polygon[i].append(frame_number)
                             handled_tracks.add(track_id)
                             print(f'Pol: {i} Track: {track_id}, center: {center}')
                             break
-        handle_times_gap(polygons, inter_times_per_polygon, img_res, fps)
+        handle_times_gap(polygons, inter_fn_per_polygon, img_res, fps)
 
         Polygon.draw_polygons_on_image(polygons, image=img_res)
         cv2.imshow('output', img_res)
@@ -169,18 +196,11 @@ def demo(opt: argparse.Namespace, fps: int, img_size: Tuple[int, int]):
     cam.release()
     out.release()
     # Plot time graphic
-    print('Plotting')
-    fig = plt.figure()
-    for i, times in enumerate(inter_times_per_polygon):
-        y = gaps_from_inter_times(times)
-        X = np.array(times) / fps
-        y = np.array(y) / fps
-        plt.plot(X, y, label=f'{rrr[i]}', marker='*')
-    plt.legend()
-    plt.xlabel('Time (sec)')
-    plt.ylabel('Gap (sec)')
-    plt.title('Gaps along time')
-    fig.savefig('cl_times.png')
+    plot_time_graphics(inter_fn_per_polygon, fps)
+
+    # Save times to file
+    record_path = os.path.join(os.path.abspath('.'), 'records', 'rec.txt')
+    save_inter_times_to_record(inter_fn_per_polygon, record_path, fps)
 
 
 if __name__ == '__main__':
@@ -188,4 +208,4 @@ if __name__ == '__main__':
     IMG_SIZE = (640, 480)
 
     opt = Opts().init()
-    demo(opt, fps=FPS, img_size=IMG_SIZE)
+    demo(opt, img_size=IMG_SIZE)
