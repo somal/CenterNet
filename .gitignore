@@ -110,4 +110,4 @@ ENV/
 # mypy
 .mypy_cache/
 
-*/.DCNv2
+*/.DCNv2*
