@@ -34,6 +34,7 @@ class COCO_CL_CTDet(data.Dataset):
         [-0.5832747, 0.00994535, -0.81221408],
         [-0.56089297, 0.71832671, 0.41158938]
     ], dtype=np.float32)
+    val_size = .1
 
     def __init__(self, opt: argparse.Namespace, split: str, annotation_folder: str):
         super(COCO_CL_CTDet, self).__init__()
@@ -72,7 +73,12 @@ class COCO_CL_CTDet(data.Dataset):
             class_name = self.class_name[self._coco_category_id_to_class_id[cat_id]]
             self._cat_stats[class_name] = len(img_ids)
 
-        self.num_samples = len(self.images)  # type: int
+        if self.split == 'train':
+            self._idx_start = 0
+            self.num_samples = int(len(self.images) * (1 - COCO_CL_CTDet.val_size))  # type: int
+        else:
+            self._idx_start = int(len(self.images) * (1 - COCO_CL_CTDet.val_size))
+            self.num_samples = len(self.images) - self._idx_start
         self.images = list(self.images)  # type: List[int]
 
         # print(f'Loaded {split} {self.num_samples} samples with classes {self.class_name}')
@@ -134,7 +140,7 @@ class COCO_CL_CTDet(data.Dataset):
         return border // i
 
     def __getitem__(self, index: int):
-        img_id = self.images[index]
+        img_id = self.images[index + self._idx_start]
         file_name = self.coco.loadImgs(ids=[img_id])[0]['file_name']
         img_path = os.path.join(self.img_dir, file_name)
         ann_ids = self.coco.getAnnIds(imgIds=[img_id])
