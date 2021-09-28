@@ -136,19 +136,6 @@ class Opts(object):
         self.parser.add_argument('--no_color_aug', action='store_true',
                                  help='not use the color augmenation '
                                       'from CornerNet')
-        # multi_pose
-        self.parser.add_argument('--aug_rot', type=float, default=0,
-                                 help='probability of applying '
-                                      'rotation augmentation.')
-        # ddd
-        self.parser.add_argument('--aug_ddd', type=float, default=0.5,
-                                 help='probability of applying crop augmentation.')
-        self.parser.add_argument('--rect_mask', action='store_true',
-                                 help='for ignored object, apply mask on the '
-                                      'rectangular region or just center point.')
-        self.parser.add_argument('--kitti_split', default='3dop',
-                                 help='different validation split for kitti: '
-                                      '3dop | subcnn')
 
         # loss
         self.parser.add_argument('--mse_loss', action='store_true',
@@ -163,20 +150,6 @@ class Opts(object):
                                  help='loss weight for keypoint local offsets.')
         self.parser.add_argument('--wh_weight', type=float, default=0.1,
                                  help='loss weight for bounding box size.')
-        # multi_pose
-        self.parser.add_argument('--hp_weight', type=float, default=1,
-                                 help='loss weight for human pose offset.')
-        self.parser.add_argument('--hm_hp_weight', type=float, default=1,
-                                 help='loss weight for human keypoint heatmap.')
-        # ddd
-        self.parser.add_argument('--dep_weight', type=float, default=1,
-                                 help='loss weight for depth.')
-        self.parser.add_argument('--dim_weight', type=float, default=1,
-                                 help='loss weight for 3d bounding box size.')
-        self.parser.add_argument('--rot_weight', type=float, default=1,
-                                 help='loss weight for orientation.')
-        self.parser.add_argument('--peak_thresh', type=float, default=0.2)
-
         # task
         # ctdet
         self.parser.add_argument('--norm_wh', action='store_true',
