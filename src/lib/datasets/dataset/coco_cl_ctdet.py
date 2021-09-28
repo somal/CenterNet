@@ -45,14 +45,23 @@ class COCO_CL_CTDet(data.Dataset):
         self.split = split
         self.opt = opt
 
-        print(f'==> initializing coco cabel_line {split} data.')
         self.data_dir = opt.data_dir
         self.images = set([])
 
+        self._annotation_folder = annotation_folder
         self.img_dir = os.path.join(self.data_dir, annotation_folder, '1')
         self.annot_path = os.path.join(self.img_dir, 'lbl', 'COCO_annotation.json')
         self.coco = coco.COCO(self.annot_path)
-        self._annotated_cat_ids = self.coco.getCatIds(catNms=self.class_name)
+
+        # Get categories in needed order
+        self._annotated_cat_ids = tuple(self.coco.getCatIds(catNms=[c])[0] for c in self.class_name
+                                        if len(self.coco.getCatIds(catNms=[c])) > 0)
+        assert isinstance(self._annotated_cat_ids, tuple) and isinstance(self._annotated_cat_ids[0], int)
+
+        # Map classes and categories (which can be different from markup to markup)
+        annotated_class_ids = range(len(self._annotated_cat_ids))
+        self._coco_category_id_to_class_id = dict(zip(self._annotated_cat_ids, annotated_class_ids))
+        self._class_id_to_coco_category_id = dict(zip(annotated_class_ids, self._annotated_cat_ids))
 
         self._cat_stats = {}  # type: Dict[int, int]
         for i, cat_id in enumerate(self._annotated_cat_ids):
@@ -60,13 +69,8 @@ class COCO_CL_CTDet(data.Dataset):
             self.images.update(set(img_ids))
 
             # Collect statistics
-            class_name = self.class_name[i]
+            class_name = self.class_name[self._coco_category_id_to_class_id[cat_id]]
             self._cat_stats[class_name] = len(img_ids)
-        assert isinstance(self._annotated_cat_ids, list) and isinstance(self._annotated_cat_ids[0], int)
-        # Map classes and categories (which can be different from makrup to markup)
-        annotated_class_ids = range(len(self._annotated_cat_ids))
-        self._coco_category_id_to_class_id = dict(zip(self._annotated_cat_ids, annotated_class_ids))
-        self._class_id_to_coco_category_id = dict(zip(annotated_class_ids, self._annotated_cat_ids))
 
         self.num_samples = len(self.images)  # type: int
         self.images = list(self.images)  # type: List[int]
@@ -280,6 +284,7 @@ class MultipleAnnotationsCOCOCL:
     @staticmethod
     def run_eval(trainer: BaseTrainer, concat_dataset: data.ConcatDataset, opt: argparse.Namespace):
         for dataset in concat_dataset.datasets:
+            print(dataset._annotation_folder)
             val_data_loader = MultipleAnnotationsCOCOCL.dataset_to_val_dataloader(dataset)
             ret, preds = trainer.val(0, val_data_loader)
             dataset.run_eval(preds, opt.save_dir)
