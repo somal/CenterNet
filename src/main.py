@@ -71,6 +71,7 @@ def main(opt: argparse.Namespace):
         num_workers=1,
         pin_memory=True
     )
+    print(f'Datasets - train: {len(train_loader)}|{opt.batch_size}, val: {len(val_loader)}')
 
     print('Starting training...')
     best = 1e10
