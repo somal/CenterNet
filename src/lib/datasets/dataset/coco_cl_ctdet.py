@@ -129,6 +129,7 @@ class COCO_CL_CTDet(data.Dataset):
         json.dump(converted_results, open(f'{save_dir}/results.json', 'w'))
         coco_dets = self.coco.loadRes(f'{save_dir}/results.json')
         coco_eval = COCOeval(self.coco, coco_dets, "bbox")
+        coco_eval.params.catIds = self._annotated_cat_ids
         coco_eval.evaluate()
         coco_eval.accumulate()
         coco_eval.summarize()
