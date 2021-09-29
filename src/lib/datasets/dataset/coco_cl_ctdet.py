@@ -3,6 +3,7 @@ import json
 import math
 import os
 from collections import Counter
+from enum import Enum
 from typing import List, Dict, Iterable
 
 import cv2
@@ -16,6 +17,12 @@ from src.lib.utils.image import color_aug
 from src.lib.utils.image import draw_dense_reg
 from src.lib.utils.image import gaussian_radius, draw_umich_gaussian, draw_msra_gaussian
 from src.lib.utils.image import get_affine_transform, affine_transform
+
+
+class Split(Enum):
+    TRAIN = 'train'
+    VAL = 'val'
+    TEST = 'test'
 
 
 class COCO_CL_CTDet(data.Dataset):
@@ -36,7 +43,7 @@ class COCO_CL_CTDet(data.Dataset):
     ], dtype=np.float32)
     val_size = .1
 
-    def __init__(self, opt: argparse.Namespace, split: str, annotation_folder: str):
+    def __init__(self, opt: argparse.Namespace, split: Split, annotation_folder: str):
         super(COCO_CL_CTDet, self).__init__()
         self.voc_color = [(v // 32 * 64 + 64, (v // 8) % 4 * 64, v % 8 * 32) for v in range(1, self.num_classes + 1)]
         self._data_rng = np.random.RandomState(123)
@@ -47,8 +54,6 @@ class COCO_CL_CTDet(data.Dataset):
         self.opt = opt
 
         self.data_dir = opt.data_dir
-        self.images = set([])
-
         self._annotation_folder = annotation_folder
         self.img_dir = os.path.join(self.data_dir, annotation_folder, '1')
         self.annot_path = os.path.join(self.img_dir, 'lbl', 'COCO_annotation.json')
@@ -65,6 +70,7 @@ class COCO_CL_CTDet(data.Dataset):
         self._class_id_to_coco_category_id = dict(zip(annotated_class_ids, self._annotated_cat_ids))
 
         self._cat_stats = {}  # type: Dict[int, int]
+        self.images = set([])
         for i, cat_id in enumerate(self._annotated_cat_ids):
             img_ids = self.coco.getImgIds(catIds=cat_id)
             self.images.update(set(img_ids))
@@ -72,16 +78,17 @@ class COCO_CL_CTDet(data.Dataset):
             # Collect statistics
             class_name = self.class_name[self._coco_category_id_to_class_id[cat_id]]
             self._cat_stats[class_name] = len(img_ids)
-
-        if self.split == 'train':
-            self._idx_start = 0
-            self.num_samples = int(len(self.images) * (1 - COCO_CL_CTDet.val_size))  # type: int
-        else:
-            self._idx_start = int(len(self.images) * (1 - COCO_CL_CTDet.val_size))
-            self.num_samples = len(self.images) - self._idx_start
         self.images = list(self.images)  # type: List[int]
 
-        # print(f'Loaded {split} {self.num_samples} samples with classes {self.class_name}')
+        if self.split == Split.TRAIN:
+            self._idx_start = 0
+            self.num_samples = int(len(self.images) * (1 - COCO_CL_CTDet.val_size))  # type: int
+        elif self.split == Split.VAL:
+            self._idx_start = int(len(self.images) * (1 - COCO_CL_CTDet.val_size))
+            self.num_samples = len(self.images) - self._idx_start
+        elif self.split == Split.TEST:
+            self._idx_start = 0
+            self.num_samples = len(self.images)
 
     def __len__(self):
         return self.num_samples
@@ -161,7 +168,7 @@ class COCO_CL_CTDet(data.Dataset):
             input_h, input_w = self.opt.input_h, self.opt.input_w
 
         flipped = False
-        if self.split == 'train':
+        if self.split == Split.TRAIN:
             if not self.opt.not_rand_crop:
                 s = s * np.random.choice(np.arange(0.6, 1.4, 0.1))
                 w_border = COCO_CL_CTDet._get_border(128, img.shape[1])
@@ -186,7 +193,7 @@ class COCO_CL_CTDet(data.Dataset):
                              (input_w, input_h),
                              flags=cv2.INTER_LINEAR)
         inp = (inp.astype(np.float32) / 255.)
-        if self.split == 'train' and not self.opt.no_color_aug:
+        if self.split == Split.TRAIN and not self.opt.no_color_aug:
             color_aug(self._data_rng, inp, self._eig_val, self._eig_vec)
         inp = (inp - self.mean) / self.std
         inp = inp.transpose(2, 0, 1)
@@ -250,7 +257,7 @@ class COCO_CL_CTDet(data.Dataset):
             del ret['wh']
         if self.opt.reg_offset:
             ret.update({'reg': reg})
-        if self.opt.debug > 0 or not self.split == 'train':
+        if self.opt.debug > 0 or not self.split == Split.TRAIN:
             gt_det = np.array(gt_det, dtype=np.float32) if len(gt_det) > 0 else \
                 np.zeros((1, 6), dtype=np.float32)
             meta = {'c': c, 's': s, 'gt_det': gt_det, 'img_id': img_id}
@@ -260,7 +267,7 @@ class COCO_CL_CTDet(data.Dataset):
 
 class MultipleAnnotationsCOCOCL:
     @staticmethod
-    def build(opt, split: str, coco_annotation_folders: Iterable[str]):
+    def build(opt, split: Split, coco_annotation_folders: Iterable[str]):
         datasets = [COCO_CL_CTDet(opt, split, annotation_folder=ann_path) for ann_path in
                     coco_annotation_folders]
         dataset = data.ConcatDataset(datasets=datasets)

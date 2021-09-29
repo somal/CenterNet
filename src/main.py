@@ -4,7 +4,7 @@ import os
 import torch
 from torch.utils import data
 
-from src.lib.datasets.dataset.coco_cl_ctdet import MultipleAnnotationsCOCOCL
+from src.lib.datasets.dataset.coco_cl_ctdet import MultipleAnnotationsCOCOCL, Split
 from src.lib.datasets.dataset_factory import get_dataset
 from src.lib.logger import Logger
 from src.lib.models.model import create_model, load_model, save_model
@@ -51,12 +51,12 @@ def main(opt: argparse.Namespace):
 
     if opt.test:
         print('Start testing')
-        concat_dataset = build_dataset(Dataset, opt, 'val')
+        concat_dataset = build_dataset(Dataset, opt, Split.TEST)
         MultipleAnnotationsCOCOCL.run_eval(trainer=trainer, concat_dataset=concat_dataset, opt=opt)
         return
 
     train_loader = torch.utils.data.DataLoader(
-        dataset=build_dataset(Dataset, opt, 'train'),
+        dataset=build_dataset(Dataset, opt, Split.TRAIN),
         batch_size=opt.batch_size,
         shuffle=True,
         num_workers=opt.num_workers,
@@ -65,7 +65,7 @@ def main(opt: argparse.Namespace):
     )
 
     val_loader = torch.utils.data.DataLoader(
-        dataset=build_dataset(Dataset, opt, 'val'),
+        dataset=build_dataset(Dataset, opt, Split.VAL),
         batch_size=1,
         shuffle=False,
         num_workers=1,
