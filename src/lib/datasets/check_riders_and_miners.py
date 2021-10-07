@@ -14,8 +14,8 @@ annotation_path = r'lbl\via_annotation2.csv'
 path_for_cropped_riders = r'C:\Users\vpavl\Desktop\CroppedRiders'
 path_for_original_riders = r'C:\Users\vpavl\Desktop\OriginalRiders'
 
-path_for_cropped_miners = r'C:\Users\vpavl\Desktop\CroppedRiders'
-path_for_original_miners = r'C:\Users\vpavl\Desktop\OriginalRiders'
+path_for_cropped_miners = r'C:\Users\vpavl\Desktop\CroppedMiners'
+path_for_original_miners = r'C:\Users\vpavl\Desktop\OriginalMiners'
 
 
 def process_one_class(dataset, folder, sub_folder, path_for_cropped, path_for_original):
