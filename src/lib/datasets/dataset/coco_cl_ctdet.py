@@ -77,7 +77,8 @@ class COCO_CL_CTDet(data.Dataset):
 
             # Collect statistics
             class_name = self.class_name[self._coco_category_id_to_class_id[cat_id]]
-            self._cat_stats[class_name] = len(img_ids)
+            ann_ids = self.coco.getAnnIds(catIds=cat_id)
+            self._cat_stats[class_name] = len(ann_ids)
         self.images = list(self.images)  # type: List[int]
 
         if self.split == Split.TRAIN:
@@ -151,7 +152,7 @@ class COCO_CL_CTDet(data.Dataset):
         img_id = self.images[index + self._idx_start]
         file_name = self.coco.loadImgs(ids=[img_id])[0]['file_name']
         img_path = os.path.join(self.img_dir, file_name)
-        ann_ids = self.coco.getAnnIds(imgIds=[img_id])
+        ann_ids = self.coco.getAnnIds(imgIds=[img_id], catIds=self._annotated_cat_ids)
         anns = self.coco.loadAnns(ids=ann_ids)
         num_objs = min(len(anns), self.max_objs)
 
