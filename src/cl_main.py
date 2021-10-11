@@ -119,7 +119,7 @@ def save_inter_times_to_record(inter_fn_per_polygon: List[List[float]], filename
         f.write('\n'.join(map(str, merged_array)))
 
 
-def demo(opt: argparse.Namespace, img_size: Tuple[int, int]):
+def demo(opt: argparse.Namespace, img_size: Tuple[int, int], save_record: bool):
     cam = cv2.VideoCapture(opt.demo)
     fps = cam.get(cv2.CAP_PROP_FPS)
     assert cam.isOpened(), f'Video reading is broken'
@@ -131,12 +131,13 @@ def demo(opt: argparse.Namespace, img_size: Tuple[int, int]):
     # miner (1) -> .1
     # seat (2) -> .3
     # loopmarker (3)
-    vis_conf_thresholds = {1: .1, 2: .1, 3: .3}
-    activated_classes = tuple([2])
-    color_by_class = {1: (0, 0, 255), 2: (255, 255, 255), 3: (255, 0, 0)}
+    # rider (4)
+    vis_conf_thresholds = {1: .3, 2: .3, 3: .3, 4: .3}
+    activated_classes = tuple([2, 4])
+    color_by_class = {1: (0, 0, 255), 2: (255, 255, 255), 3: (255, 0, 0), 4: (0, 255, 0)}
     detector = CtdetDetector(opt, vis_conf_thresholds=vis_conf_thresholds)
     detector.pause = False
-    tracker_by_class = {class_id: Tracker(min_hits_to_track=10, iou_threshold=.1, nonactive_track_max_times=30)
+    tracker_by_class = {class_id: Tracker(min_hits_to_track=3, iou_threshold=.1, nonactive_track_max_times=30)
                         for class_id in activated_classes}
 
     polygons = Polygon.read_polygons_from_json(opt.demo)
@@ -152,12 +153,17 @@ def demo(opt: argparse.Namespace, img_size: Tuple[int, int]):
             break
         img = cv2.resize(img, dsize=img_size)
         img_res, ret = detector.run(img)
+        img_dets = img_res.copy()
 
         # Apply tracking
         tracked_bboxes = {}
         for class_id in activated_classes:
             good_score_detections = list(filter(lambda bbox: bbox[4] >= vis_conf_thresholds[class_id],
                                                 ret['results'][class_id]))
+            for bbox in good_score_detections:
+                bbox_int = list(map(int, bbox))
+                cv2.rectangle(img_dets, bbox_int[:2], bbox_int[2:4], color=color_by_class[class_id], thickness=2)
+
             bboxes_for_tracker = [convert_real_to_norm_bbox_coords(bbox, img_size) for bbox in
                                   good_score_detections]
             tracked_bboxes[class_id] = tracker_by_class[class_id].update(bboxes_for_tracker)
@@ -187,6 +193,7 @@ def demo(opt: argparse.Namespace, img_size: Tuple[int, int]):
 
         Polygon.draw_polygons_on_image(polygons, image=img_res)
         cv2.imshow('output', img_res)
+        cv2.imshow('detections', img_dets)
         out.write(img_res)
         if cv2.waitKey(1) == ord(' '):
             print('Break the loop')
@@ -199,8 +206,9 @@ def demo(opt: argparse.Namespace, img_size: Tuple[int, int]):
     plot_time_graphics(inter_fn_per_polygon, fps)
 
     # Save times to file
-    record_path = os.path.join(os.path.abspath('.'), 'records', 'rec.txt')
-    save_inter_times_to_record(inter_fn_per_polygon, record_path, fps)
+    if save_record:
+        record_path = os.path.join(os.path.abspath('.'), 'records', 'rec_4cl_2_min_hit_5.txt')
+        save_inter_times_to_record(inter_fn_per_polygon, record_path, fps)
 
 
 if __name__ == '__main__':
@@ -208,4 +216,4 @@ if __name__ == '__main__':
     IMG_SIZE = (640, 480)
 
     opt = Opts().init()
-    demo(opt, img_size=IMG_SIZE)
+    demo(opt, img_size=IMG_SIZE, save_record=False)
