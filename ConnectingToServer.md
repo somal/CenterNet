@@ -1,46 +1,27 @@
 The code was taken from [here](https://towardsdatascience.com/effective-deep-learning-development-environment-with-pycharm-and-docker-34018f122d92).
 
-1. Build container and run
+1. Build container and run. (Before running write in dockerfile user and password)
 ```
-docker build --tag center_net_env --file test/DockerCenterNet/CenterNet.dockerfile .
-
-docker run --gpus all -it --rm -p 8022:22 -v /home/vpavlishen/CenterNet:/home/test --name center_net_env center_net_env bash
+docker build --tag remote_ssh_python --file path/to/dockerfile/remote_ssh_python.dockerfile .
+docker run --gpus all -it -p 8022:22  --name remote_ssh_python remote_ssh_python bash
 ```
-2. In the container do the following commands:
+2. Exit the container and run the following command:
 ```
-apt update && apt install -y openssh-server
-
-mkdir /var/run/sshd
-
-echo 'root:<USE_YOUR_OWN_STRONG_PASSWORD>' | chpasswd
-# Root password was changed with <USE_YOUR_OWN_STRONG_PASSWORD>
-
-sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-
-sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
-
-echo "export VISIBLE=now" >> /etc/profile
-
-service ssh restart
-
-adduser user
-
-adduser user sudo
+docker start "container_id"    
 ```
-3. In another terminal window, outside the container
+3. Go inside the container:
 ```
-docker commit center_net_env center_net_env_ssh
+docker exec -it "container_id" bash
 ```
-4. Exit the container
-5. Run container from the new image.
+4. Inside the container run the following command:
 ```
-docker run --gpus all -it --rm -p 8022:22 -v /home/vpavlishen/CenterNet:/home/test --name center_net_env_ssh center_net_env_ssh bash
-
 service ssh start
 ```
-6.  ssh tunnel
+5. Now you can quit from container
+6.  ssh tunnel (own machine)
 ```
-ssh -L 8022:192.168.0.55:8022 vpavlishen@195.91.176.132
+ssh -L 8022:192.168.0.55:8022 test_user@195.91.176.132
 ```
 
-7. Connect to python interpreter through ssh tunnel.
+7. Connect to the python interpreter through a ssh tunnel using the "user" defined in dockerfile
+8. To execute files, You must sync folders. (Note: create separate directly)
