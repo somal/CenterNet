@@ -43,4 +43,8 @@ def markup(video_path: str):
 
 
 if __name__ == '__main__':
-    markup('../videos/for_demo/ip:10.160.67.23_id:12_start:01:21:00.mp4')
+    print('Actions:\n'
+          '- Left button - add point\n'
+          '- Right button - delete last point\n'
+          '- Enter - finish polygon and go on\n')
+    markup('../videos/for_demo/РК_4_ВНС-1_ККД_верх_(ШТ)_Т000_202_051|2021.08.31|06-40-30-08-00-30.mkv')
