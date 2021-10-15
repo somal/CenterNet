@@ -1,4 +1,4 @@
-FROM nvidia/cuda:11.0.3-cudnn8-runtime-ubuntu18.04
+FROM nvidia/cuda:11.1.1-cudnn8-devel-ubuntu18.04
 ENV TZ=Asia/Novokuznetsk
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
@@ -22,7 +22,11 @@ RUN apt-get install -y --no-install-recommends \
         g++ \
         unixodbc-dev \
         odbc-postgresql
-RUN apt update && apt install -y openssh-server
+
+RUN apt update
+    && apt install -y openssh-server \
+       vim
+
 RUN apt-get clean
 RUN pip3 install --upgrade pip
 
@@ -41,7 +45,7 @@ RUN mkdir /var/run/sshd \
 
 # PASSWORD
 RUN useradd -ms /bin/bash user \
-    && echo 'user:PASSWORD' | chpasswd
+    && echo 'user:PASSWORD' | chpasswd \
+    && adduser docker sudo
 
-RUN service ssh start
 
