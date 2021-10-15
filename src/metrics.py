@@ -33,6 +33,6 @@ def calc_metric(gt_path: Path, records_path: Path, max_dist: float = 5.0):
 
 
 if __name__ == '__main__':
-    gt_path = Path('./records/gt.txt').absolute()
-    records_path = Path('./records/rec_min_hit_5.txt').absolute()
-    calc_metric(gt_path, records_path)
+    gt_path = Path('./records/gt_centered.txt').absolute()
+    records_path = Path('./records/rec_4cl_2_min_hit_5.txt').absolute()
+    calc_metric(gt_path, records_path, max_dist=5.0)

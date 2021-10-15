@@ -11,7 +11,8 @@ from src.lib.models.model import create_model, load_model, save_model
 from src.lib.opts import Opts
 from src.lib.trains.ctdet import CtdetTrainer
 
-coco_annotation_folders = ('esaul_20', 'esaul_21', 'raspd-2_30', 'rcocs-1_12')
+# coco_annotation_folders = ('esaul_20', 'esaul_21', 'raspd-2_30', 'rcocs-1_12')
+coco_annotation_folders = tuple(['merged_dataset_2'])
 
 
 def build_dataset(dataset_cls, opt: argparse.Namespace, split):

@@ -35,6 +35,8 @@ class Opts(object):
                                       'set load_model to model_last.pth '
                                       'in the exp dir if load_model is empty.')
 
+        self.parser.add_argument('--save_record', action='store_true', default=False)
+
         # system
         self.parser.add_argument('--gpus', default='0',
                                  help='-1 for CPU, use comma for multiple gpus')
@@ -311,7 +313,7 @@ class Opts(object):
 
     def init(self, args=''):
         default_dataset_info = {
-            'ctdet': {'default_resolution': [512, 512], 'num_classes': 3,
+            'ctdet': {'default_resolution': [512, 512], 'num_classes': 4,
                       'mean': [0.408, 0.447, 0.470], 'std': [0.289, 0.274, 0.278],
                       'dataset': 'coco_cl'}
         }

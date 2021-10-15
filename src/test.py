@@ -13,7 +13,7 @@ from src.lib.utils.utils import AverageMeter
 
 class PrefetchDataset(torch.utils.data.Dataset):
     def __init__(self, opt, dataset, pre_process_func):
-        self.images = dataset.images
+        self.images = dataset._coco_annotation_ids
         self.load_image_func = dataset.coco.loadImgs
         self.img_dir = dataset.img_dir
         self.pre_process_func = pre_process_func
@@ -31,7 +31,7 @@ class PrefetchDataset(torch.utils.data.Dataset):
                     image, scale, img_info['calib'])
             else:
                 images[scale], meta[scale] = self.pre_process_func(image, scale)
-        return img_id, {'images': images, 'image': image, 'meta': meta}
+        return img_id, {'_coco_annotation_ids': images, 'image': image, 'meta': meta}
 
     def __len__(self):
         return len(self.images)
@@ -92,7 +92,7 @@ def test(opt):
     time_stats = ['tot', 'load', 'pre', 'net', 'dec', 'post', 'merge']
     avg_time_stats = {t: AverageMeter() for t in time_stats}
     for ind in range(num_iters):
-        img_id = dataset.images[ind]
+        img_id = dataset._coco_annotation_ids[ind]
         img_info = dataset.coco.loadImgs(ids=[img_id])[0]
         img_path = os.path.join(dataset.img_dir, img_info['file_name'])
 
