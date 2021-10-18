@@ -87,7 +87,7 @@ def handle_times_gap(polygons: List[Polygon], inter_fn_per_polygon: List[List[fl
         frame_diff = gaps[-1] / fps if len(gaps) > 0 else 0
         cv2.putText(img_res, f'Gap time {i} {frame_diff:.2f}', (30, 50 * (i + 1)),
                     fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
-    cv2.putText(img_res, f'Count L {len(inter_fn_per_polygon[0])}    R {len(inter_fn_per_polygon[1])}',
+    cv2.putText(img_res, f'Count {" ".join([str(len(fnp)) for fnp in inter_fn_per_polygon])}',
                 (30, 50 * (len(polygons) + 1)),
                 fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.75, color=(255, 255, 255))
 
@@ -133,14 +133,16 @@ def demo(opt: argparse.Namespace, img_size: Tuple[int, int], save_record: bool):
     # loopmarker (3)
     # rider (4)
     vis_conf_thresholds = {1: .3, 2: .3, 3: .3, 4: .3}
-    activated_classes = tuple([2, 4])
+    track_cls_to_det_cls = {2: (2, 4)}  # 1: (1, )
+    track_classes = list(track_cls_to_det_cls.keys())
     color_by_class = {1: (0, 0, 255), 2: (255, 255, 255), 3: (255, 0, 0), 4: (0, 255, 0)}
     detector = CtdetDetector(opt, vis_conf_thresholds=vis_conf_thresholds)
     detector.pause = False
-    tracker_by_class = {class_id: Tracker(min_hits_to_track=3, iou_threshold=.1, nonactive_track_max_times=30)
-                        for class_id in activated_classes}
+    tracker_by_class = {
+        class_id: Tracker(min_hits_to_track=1 * fps, iou_threshold=.1, nonactive_track_max_times=3 * fps)
+        for class_id in track_classes}
 
-    polygons = Polygon.read_polygons_from_json(opt.demo)
+    polygons = Polygon.read_polygons_from_json(opt.demo)[:1]
 
     inter_fn_per_polygon = [[] for _ in range(len(polygons))]
     frame_number = 0
@@ -151,30 +153,42 @@ def demo(opt: argparse.Namespace, img_size: Tuple[int, int], save_record: bool):
         if not is_opened:
             print('Finish by unabled images')
             break
+
+        if frame_number < 1400 * fps:
+            continue
+        # elif frame_number > 1630 * fps:
+        #     break
         img = cv2.resize(img, dsize=img_size)
         img_res, ret = detector.run(img)
         img_dets = img_res.copy()
 
         # Apply tracking
         tracked_bboxes = {}
-        for class_id in activated_classes:
-            good_score_detections = list(filter(lambda bbox: bbox[4] >= vis_conf_thresholds[class_id],
-                                                ret['results'][class_id]))
-            for bbox in good_score_detections:
-                bbox_int = list(map(int, bbox))
-                cv2.rectangle(img_dets, bbox_int[:2], bbox_int[2:4], color=color_by_class[class_id], thickness=2)
+        for trck_class_id in track_cls_to_det_cls:
+            good_score_detections = []
+            for det_cls_id in track_cls_to_det_cls[trck_class_id]:
+                good_score_detections += list(
+                    filter(lambda bbox: bbox[4] >= vis_conf_thresholds[det_cls_id], ret['results'][det_cls_id]))
+
+                for bbox in good_score_detections:
+                    bbox_int = list(map(int, bbox))
+                    cv2.rectangle(img_dets, bbox_int[:2], bbox_int[2:4], color=color_by_class[det_cls_id], thickness=2)
+                    cv2.putText(img_dets,
+                                f'{bbox[4]:.2f}',
+                                bbox_int[:2],
+                                fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=.5, color=(255, 255, 255))
 
             bboxes_for_tracker = [convert_real_to_norm_bbox_coords(bbox, img_size) for bbox in
                                   good_score_detections]
-            tracked_bboxes[class_id] = tracker_by_class[class_id].update(bboxes_for_tracker)
+            tracked_bboxes[trck_class_id] = tracker_by_class[trck_class_id].update(bboxes_for_tracker)
 
         # Analyze tracks
-        for class_id in activated_classes:
-            for track_id in tracked_bboxes[class_id]:
+        for trck_class_id in tracked_bboxes:
+            for track_id in tracked_bboxes[trck_class_id]:
                 # Draw results for debugging
-                norm_bbox = tracked_bboxes[class_id][track_id]
+                norm_bbox = tracked_bboxes[trck_class_id][track_id]
                 real_bbox = convert_norm_to_real_bbox_coords(norm_bbox, img_size=img_size)
-                cv2.rectangle(img_res, real_bbox[:2], real_bbox[2:4], color=color_by_class[class_id], thickness=2)
+                cv2.rectangle(img_res, real_bbox[:2], real_bbox[2:4], color=color_by_class[trck_class_id], thickness=2)
                 cv2.putText(img_res,
                             f'{track_id}',
                             real_bbox[:2],
@@ -207,7 +221,7 @@ def demo(opt: argparse.Namespace, img_size: Tuple[int, int], save_record: bool):
 
     # Save times to file
     if save_record:
-        record_path = os.path.join(os.path.abspath('.'), 'records', 'rec_4cl_2_min_hit_5.txt')
+        record_path = os.path.join(os.path.abspath('.'), 'records', 'rec_4cl_3_min_hit_5.txt')
         save_inter_times_to_record(inter_fn_per_polygon, record_path, fps)
 
 
@@ -216,4 +230,4 @@ if __name__ == '__main__':
     IMG_SIZE = (640, 480)
 
     opt = Opts().init()
-    demo(opt, img_size=IMG_SIZE, save_record=False)
+    demo(opt, img_size=IMG_SIZE, save_record=opt.save_record)
